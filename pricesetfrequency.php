@@ -409,3 +409,148 @@ function pricesetfrequency_civicrm_postSave_civicrm_price_field($dao) {
 function pricesetfrequency_civicrm_postSave_civicrm_price_field_value($dao) {
   Civi::$statics['inserted_price_field_value_id'] = $dao->id;
 }
+
+/**
+ * Save the last insert price field value id in statics.
+ * @param $dao
+ */
+function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
+  $contribution = civicrm_api3('Contribution', 'getsingle', array(
+    'id'         => $dao->id,
+    'return'     => ["contribution_source", "contact_id", "financial_type_id", "contribution_page_id", "payment_instrument_id", "receive_date", "non_deductible_amount", "total_amount", "fee_amount", "net_amount", "trxn_id", "invoice_id", "currency", "cancel_date", "cancel_reason", "receipt_date", "thankyou_date", "source", "amount_level", "contribution_recur_id", "is_test", "is_pay_later", "contribution_status_id", "address_id", "check_number", "campaign_id", "creditnote_id", "tax_amount", "revenue_recognition_date"],
+    'sequential' => TRUE,
+  ));
+
+  if ($contribution['contribution_status'] == 'Completed' && isset($contribution['contribution_page_id']) && $contribution['contribution_page_id'] != '') {
+
+    $lineItems = civicrm_api3('LineItem', 'get', [
+      'sequential'      => 1,
+      'contribution_id' => $dao->id,
+      'return' => ["id", "entity_table", "entity_id", "contribution_id", "price_field_id", "label", "qty", "unit_price", "line_total", "participant_count", "price_field_value_id", "financial_type_id", "non_deductible_amount", "tax_amount"],
+    ]);
+
+    $lineItems = $lineItems['values'];
+    if (count($lineItems) <= 1) {
+      return;
+    }
+
+    $recurringContribution = NULL;
+
+    if (isset($contribution['contribution_recur_id']) && $contribution['contribution_recur_id']) {
+      $recurringContribution = civicrm_api3('ContributionRecur', 'getsingle', array(
+        'id' => $contribution['contribution_recur_id'],
+      ));
+    }
+
+    $updatedLineItems = FALSE;
+    foreach ($lineItems as $lineItem) {
+      $priceFieldId = $lineItem['price_field_id'];
+      $priceFieldValuId = $lineItem['price_field_value_id'];
+
+      try {
+        $invidiaulConfig = civicrm_api3('PricesetIndividualContribution', 'getsingle', array(
+          'price_field_id' => $priceFieldId,
+          'price_field_value_id' => $priceFieldValuId,
+        ));
+        if (isset($invidiaulConfig['create_individual_contribution']) && $invidiaulConfig['create_individual_contribution']) {
+          $newContribution = $contribution;
+
+          unset($newContribution['id']);
+          unset($newContribution['contribution_id']);
+          unset($newContribution['contribution_recur_id']);
+          unset($newContribution['invoice_id']);
+          unset($newContribution['trxn_id']);
+
+          $newContribution['total_amount'] = $lineItem['line_total'] + $lineItem['tax_amount'];
+          $newContribution['net_amount'] = $newContribution['total_amount'];
+          $newContribution['tax_amount'] = $lineItem['tax_amount'];
+
+          $contribution['total_amount'] -= $newContribution['total_amount'];
+          $contribution['net_amount'] -= $newContribution['net_amount'];
+          $contribution['tax_amount'] -= $newContribution['tax_amount'];
+
+          if ($recurringContribution) {
+            $newRecurringContribution = $recurringContribution;
+            unset($newRecurringContribution['id']);
+            unset($newRecurringContribution['trxn_id']);
+            unset($newRecurringContribution['invoice_id']);
+
+            $newRecurringContribution['amount'] = $newContribution['total_amount'];
+            $newRecurringContribution['frequency_unit'] = $invidiaulConfig['recurring_contribution_unit'];
+            $newRecurringContribution['frequency_interval'] = $invidiaulConfig['recurring_contribution_interval'];
+
+            $nextDate = new DateTime(date('Y-m-d 00:00:00'));
+            $nextDate->modify("+{$invidiaulConfig['recurring_contribution_interval']} " .
+              "{$invidiaulConfig['recurring_contribution_unit']}s");
+
+            $newRecurringContribution['next_sched_contribution_date'] = $nextDate->format("Y-m-d H:i:s");
+            $newRecurringContribution['next_sched_contribution'] = $nextDate->format("Y-m-d H:i:s");
+
+            $recurringContribution['amount'] -= $newRecurringContribution['amount'];
+
+            try {
+              $newRecurringContribution = civicrm_api3('ContributionRecur', 'create', $newRecurringContribution);
+              $newContribution['contribution_recur_id'] = $newRecurringContribution['id'];
+            }
+            catch (CiviCRM_API3_Exception $e) {
+
+            }
+
+          }
+
+          try {
+
+            $priceFieldObject = civicrm_api3('PriceField', 'getsingle', [
+              'return' => ["price_set_id"],
+              'id'     => $lineItem['price_field_id'],
+            ]);
+
+            $newContribution['line_item'] = array(
+              $priceFieldObject['price_set_id'] => array(),
+            );
+
+            $newContribution = civicrm_api3('Contribution', 'create', $newContribution);
+
+            CRM_Core_DAO::setFieldValue('CRM_Price_DAO_LineItem', $lineItem['id'], 'contribution_id', $newContribution['id']);
+            CRM_Core_DAO::setFieldValue('CRM_Price_DAO_LineItem', $lineItem['id'], 'entity_id', $newContribution['id']);
+
+            $updatedLineItems = TRUE;
+
+          }
+          catch (CiviCRM_API3_Exception $e) {
+
+          }
+
+        }
+      }
+      catch (CiviCRM_API3_Exception $e) {
+        // Line item configuration not found. Skip!
+      }
+    }
+
+    if ($recurringContribution['amount'] == 0) {
+      civicrm_api3('ContributionRecur', 'delete', [
+        'id' => $recurringContribution['id'],
+      ]);
+    }
+    else {
+      civicrm_api3('ContributionRecur', 'create', [
+        'id'     => $recurringContribution['id'],
+        'amount' => $recurringContribution['amount'],
+      ]);
+    }
+
+    if ($contribution['total_amount'] == 0) {
+      civicrm_api3('Contribution', 'delete', [
+        'id' => $contribution['id'],
+      ]);
+    }
+    else {
+      if ($updatedLineItems) {
+        CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_Contribution', $contribution['id'], 'total_amount', $contribution['total_amount']);
+        CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_Contribution', $contribution['id'], 'tax_amount', $contribution['tax_amount']);
+        CRM_Core_DAO::setFieldValue('CRM_Contribute_DAO_Contribution', $contribution['id'], 'net_amount', $contribution['net_amount']);
+      }
+    }
+  }
+}
