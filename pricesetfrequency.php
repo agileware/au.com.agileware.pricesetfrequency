@@ -415,11 +415,17 @@ function pricesetfrequency_civicrm_postSave_civicrm_price_field_value($dao) {
  * @param $dao
  */
 function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
-  $contribution = civicrm_api3('Contribution', 'getsingle', array(
+  $contribution = civicrm_api3('Contribution', 'get', array(
     'id'         => $dao->id,
     'return'     => ["contribution_source", "contact_id", "financial_type_id", "contribution_page_id", "payment_instrument_id", "receive_date", "non_deductible_amount", "total_amount", "fee_amount", "net_amount", "trxn_id", "invoice_id", "currency", "cancel_date", "cancel_reason", "receipt_date", "thankyou_date", "source", "amount_level", "contribution_recur_id", "is_test", "is_pay_later", "contribution_status_id", "address_id", "check_number", "campaign_id", "creditnote_id", "tax_amount", "revenue_recognition_date"],
     'sequential' => TRUE,
   ));
+
+  if (count($contribution['values']) == 0) {
+    return;
+  }
+
+  $contribution = $contribution['values'][0];
 
   if ($contribution['contribution_status'] == 'Completed' && isset($contribution['contribution_page_id']) && $contribution['contribution_page_id'] != '') {
 
@@ -437,9 +443,17 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
     $recurringContribution = NULL;
 
     if (isset($contribution['contribution_recur_id']) && $contribution['contribution_recur_id']) {
-      $recurringContribution = civicrm_api3('ContributionRecur', 'getsingle', array(
+      $recurringContribution = civicrm_api3('ContributionRecur', 'get', array(
         'id' => $contribution['contribution_recur_id'],
+        'sequential' => TRUE,
       ));
+
+      if (count($recurringContribution['values'])) {
+        $recurringContribution = $recurringContribution['values'][0];
+      }
+      else {
+        $recurringContribution = NULL;
+      }
     }
 
     $updatedLineItems = FALSE;
@@ -528,21 +542,29 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
       }
     }
 
-    if ($recurringContribution['amount'] == 0) {
-      civicrm_api3('ContributionRecur', 'delete', [
-        'id' => $recurringContribution['id'],
-      ]);
-    }
-    else {
-      civicrm_api3('ContributionRecur', 'create', [
-        'id'     => $recurringContribution['id'],
-        'amount' => $recurringContribution['amount'],
-      ]);
+    if ($recurringContribution) {
+      if ($recurringContribution['amount'] == 0) {
+        civicrm_api3('ContributionRecur', 'create', [
+          'id'                     => $recurringContribution['id'],
+          'amount'                 => $recurringContribution['amount'],
+          'contribution_status_id' => 'Cancelled',
+        ]);
+      }
+      else {
+        civicrm_api3('ContributionRecur', 'create', [
+          'id'     => $recurringContribution['id'],
+          'amount' => $recurringContribution['amount'],
+        ]);
+      }
     }
 
     if ($contribution['total_amount'] == 0) {
-      civicrm_api3('Contribution', 'delete', [
-        'id' => $contribution['id'],
+      civicrm_api3('Contribution', 'create', [
+        'id'                     => $contribution['id'],
+        'contribution_status_id' => 'Cancelled',
+        'total_amount'           => $contribution['total_amount'],
+        'tax_amount'             => $contribution['tax_amount'],
+        'net_amount'             => $contribution['net_amount'],
       ]);
     }
     else {
