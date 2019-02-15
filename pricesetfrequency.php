@@ -241,7 +241,7 @@ function setPriceSetContributionDefaultValues($priceFieldExtras, &$form) {
 function validateSingleContributionFormFields($fields, &$errors) {
   $recurringInterval = CRM_Utils_Array::value('recurring_contribution_interval', $fields);
 
-  if ($recurringInterval != '' && !CRM_Utils_Type::validate($recurringInterval, 'Int', FALSE, ts('Recurring Contribution Interval')) || $recurringInterval < 1) {
+  if ($recurringInterval != '' && (!CRM_Utils_Type::validate($recurringInterval, 'Int', FALSE, ts('Recurring Contribution Interval')) || $recurringInterval < 1)) {
     $errors['recurring_contribution_interval'] = ts('Recurring Contribution Interval must be a number greater than 1.');
   }
 }
@@ -274,7 +274,7 @@ function pricesetfrequency_civicrm_validateForm($formName, &$fields, &$files, &$
           if ($optionLabel != '' && $optionAmount != '') {
 
             $recurringInterval = $form->getSubmitValue('option_recurring_contribution_interval[' . $i . ']');
-            if ($recurringInterval != '' && !CRM_Utils_Type::validate($recurringInterval, 'Int', FALSE, ts('Recurring Contribution Interval')) || $recurringInterval < 1) {
+            if ($recurringInterval != '' && (!CRM_Utils_Type::validate($recurringInterval, 'Int', FALSE, ts('Recurring Contribution Interval')) || $recurringInterval < 1)) {
               $errors['option_recurring_contribution_interval[' . $i . ']'] = ts('Recurring Contribution Interval must be a number greater than 1.');
             }
           }
