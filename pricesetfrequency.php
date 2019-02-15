@@ -143,6 +143,8 @@ function addContributionFormFields(&$form) {
 
   $form->add('checkbox', 'create_individual_contribution', ts('Create Individual Contribution'));
 
+  $form->add('text', 'individual_contribution_source', ts('Contribution Source'));
+
   $units = array(
     ''      => ts('- select -'),
     'day'   => ts('day'),
@@ -157,6 +159,7 @@ function addContributionFormFields(&$form) {
     $form->add('checkbox', 'option_create_individual_contribution[' . $i . ']', ts('Create Individual Contribution'));
     $form->add('select', 'option_recurring_contribution_unit[' . $i . ']', ts('Recurring Contribution Unit'), $units);
     $form->add('text', 'option_recurring_contribution_interval[' . $i . ']', ts('Recurring Contribution Interval'), array('size' => 5, 'maxlength' => 3));
+    $form->add('text', 'option_individual_contribution_source[' . $i . ']', ts('Contribution Source'), array('size' => 10));
   }
 
   $defaults['recurring_contribution_interval'] = 1;
@@ -229,6 +232,7 @@ function setPriceSetContributionDefaultValues($priceFieldExtras, &$form) {
   $defaults['create_individual_contribution'] = $priceFieldExtras['create_individual_contribution'];
   $defaults['recurring_contribution_unit'] = $priceFieldExtras['recurring_contribution_unit'];
   $defaults['recurring_contribution_interval'] = $priceFieldExtras['recurring_contribution_interval'];
+  $defaults['individual_contribution_source'] = $priceFieldExtras['contribution_source'];
   $form->setDefaults($defaults);
 }
 
@@ -297,9 +301,18 @@ function savePriceFieldOptionExtras($fieldId, $optionId, &$form) {
   $recurringInterval = $form->getSubmitValue('recurring_contribution_interval');
   $recurringUnit = $form->getSubmitValue('recurring_contribution_unit');
   $createIndividualContribution = $form->getSubmitValue('create_individual_contribution');
+  $individualContributionSource = $form->getSubmitValue('individual_contribution_source');
 
   if (!isset($createIndividualContribution)) {
     $createIndividualContribution = 0;
+  }
+
+  if (!$recurringInterval) {
+    $recurringInterval = 1;
+  }
+
+  if (!$recurringUnit) {
+    $recurringUnit = 'month';
   }
 
   $individualContribution = civicrm_api3('PricesetIndividualContribution', 'get', [
@@ -321,6 +334,7 @@ function savePriceFieldOptionExtras($fieldId, $optionId, &$form) {
   $individualContribution['create_individual_contribution'] = $createIndividualContribution;
   $individualContribution['recurring_contribution_unit'] = $recurringUnit;
   $individualContribution['recurring_contribution_interval'] = $recurringInterval;
+  $individualContribution['contribution_source'] = $individualContributionSource;
 
   civicrm_api3('PricesetIndividualContribution', 'create', $individualContribution);
 }
@@ -368,20 +382,28 @@ function pricesetfrequency_civicrm_postProcess($formName, &$form) {
             $createIndividualContribution = $form->getSubmitValue('option_create_individual_contribution[' . $i . ']');
             $recurringUnit = $form->getSubmitValue('option_recurring_contribution_unit[' . $i . ']');
             $recurringInterval = $form->getSubmitValue('option_recurring_contribution_interval[' . $i . ']');
+            $contributionSource = $form->getSubmitValue('option_individual_contribution_source[' . $i . ']');
 
             if (!isset($createIndividualContribution)) {
               $createIndividualContribution = 0;
+            }
+            if (!$recurringInterval) {
+              $recurringInterval = 1;
+            }
+            if (!$recurringUnit) {
+              $recurringUnit = 'month';
             }
 
             if (isset($priceFieldValues[$valueIndex])) {
               $priceFieldValue = $priceFieldValues[$valueIndex];
 
               civicrm_api3('PricesetIndividualContribution', 'create', array(
-                'price_field_id' => $priceFieldId,
-                'price_field_value_id' => $priceFieldValue['id'],
-                'create_individual_contribution' => $createIndividualContribution,
-                'recurring_contribution_unit' => $recurringUnit,
+                'price_field_id'                  => $priceFieldId,
+                'price_field_value_id'            => $priceFieldValue['id'],
+                'create_individual_contribution'  => $createIndividualContribution,
+                'recurring_contribution_unit'     => $recurringUnit,
                 'recurring_contribution_interval' => $recurringInterval,
+                'contribution_source'             => $contributionSource,
               ));
 
             }
@@ -476,6 +498,7 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
           $newContribution['total_amount'] = $lineItem['line_total'] + $lineItem['tax_amount'];
           $newContribution['net_amount'] = $newContribution['total_amount'];
           $newContribution['tax_amount'] = $lineItem['tax_amount'];
+          $newContribution['contribution_source'] = $invidiaulConfig['contribution_source'];
 
           if ($newContribution['total_amount'] != $contribution['total_amount']) {
             unset($newContribution['id']);

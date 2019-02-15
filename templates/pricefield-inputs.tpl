@@ -6,7 +6,7 @@
     </style>
 {/literal}
 <div class="crm-price-field-form-block-create-individual-contribution">
-    <div class="label"><label for="weight">  Create Individual Contribution</label></div>
+    <div class="label"><label for="create_individual_contribution">  Create Individual Contribution</label></div>
     <div>
         {$form.create_individual_contribution.html}
         <span class="description">
@@ -16,7 +16,7 @@
 </div>
 
 <div class="crm-price-field-form-block-recurring-contribution-unit">
-    <div class="label"><label for="weight">  Recurring Contribution Unit</label></div>
+    <div class="label"><label for="recurring_contribution_unit">  Recurring Contribution Unit</label></div>
     <div>
         {$form.recurring_contribution_unit.html}
         <span class="description">
@@ -26,12 +26,19 @@
 </div>
 
 <div class="crm-price-field-form-block-recurring-contribution-interval">
-    <div class="label"><label for="weight">  Recurring Contribution Interval</label></div>
+    <div class="label"><label for="recurring_contribution_interval">  Recurring Contribution Interval</label></div>
     <div>
         {$form.recurring_contribution_interval.html}
         <span class="description">
             Individual recurring contribution interval
         </span>
+    </div>
+</div>
+
+<div class="crm-price-field-form-block-individual-contribution-source">
+    <div class="label"><label for="individual_contribution_source">  Contribution Source</label></div>
+    <div>
+        {$form.individual_contribution_source.html}
     </div>
 </div>
 
@@ -49,6 +56,9 @@
             <div class="price_field_option_recur_contribution_interval">
                 {$form.option_recurring_contribution_interval.$index.html}
             </div>
+            <div class="price_field_option_recur_contribution_source">
+                {$form.option_individual_contribution_source.$index.html}
+            </div>
         </div>
     {/section}
 </div>
@@ -60,21 +70,25 @@
         cj('#optionField tbody tr:first-child').append('<th>Create Individual Contribution?</th>');
         cj('#optionField tbody tr:first-child').append('<th>Recurring Contribution Unit</th>');
         cj('#optionField tbody tr:first-child').append('<th>Recurring Contribution Interval</th>');
+        cj('#optionField tbody tr:first-child').append('<th>Contribution Source</th>');
 
         cj('#optionField tbody tr').each(function(index){
 
             var optionCell = cj('<td>');
             var unitCell = cj('<td>');
             var intervalCell = cj('<td>');
+            var sourceCell = cj('<td>');
 
             optionCell.html(cj('.price_field_option_extra_' + index).find('.price_field_option_individual_contribution').html());
             unitCell.html(cj('.price_field_option_extra_' + index).find('.price_field_option_recur_contribution_unit').html());
             intervalCell.html(cj('.price_field_option_extra_' + index).find('.price_field_option_recur_contribution_interval').html());
+            sourceCell.html(cj('.price_field_option_extra_' + index).find('.price_field_option_recur_contribution_source').html());
 
             if (index != 0) {
                 cj(this).append(optionCell);
                 cj(this).append(unitCell);
                 cj(this).append(intervalCell);
+                cj(this).append(sourceCell);
             }
         });
     }
@@ -84,7 +98,8 @@
     var classesToShift = [
         '.crm-price-field-form-block-create-individual-contribution',
         '.crm-price-field-form-block-recurring-contribution-unit',
-        '.crm-price-field-form-block-recurring-contribution-interval'
+        '.crm-price-field-form-block-recurring-contribution-interval',
+        '.crm-price-field-form-block-individual-contribution-source',
     ];
     var insertAfterClass = '.crm-price-field-form-block-price';
 

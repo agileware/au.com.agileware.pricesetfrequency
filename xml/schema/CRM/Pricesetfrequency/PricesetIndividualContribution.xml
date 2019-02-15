@@ -46,6 +46,19 @@
   </field>
 
   <field>
+    <name>contribution_source</name>
+    <type>varchar</type>
+    <length>255</length>
+    <import>true</import>
+    <export>true</export>
+    <comment>Source of individual contribution.</comment>
+    <default>NULL</default>
+    <html>
+      <type>Text</type>
+    </html>
+  </field>
+
+  <field>
     <name>recurring_contribution_interval</name>
     <title>Recurring Contribution Interval</title>
     <type>int unsigned</type>
