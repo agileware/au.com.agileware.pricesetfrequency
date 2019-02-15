@@ -186,6 +186,64 @@ function addContributionFormFields(&$form) {
 }
 
 /**
+ * @param $elements
+ */
+function updatePricefieldElements(&$elements, &$totalPriceFields, &$updatedPriceFields) {
+  foreach ($elements as $index => $element) {
+    if (isset($element->_attributes) && isset($element->_attributes['price'])) {
+      $priceValue = str_replace("\"", "", trim($element->_attributes['price'], "[]\""));
+      $priceField = explode(",", $priceValue);
+      if (count($priceField) > 0) {
+        $totalPriceFields++;
+        $priceFieldExtras = civicrm_api3('PricesetIndividualContribution', 'get', array(
+          'price_field_value_id' => $priceField[0],
+          'sequential'     => TRUE,
+        ));
+
+        if (count($priceFieldExtras['values']) > 0) {
+          $priceFieldExtras = $priceFieldExtras['values'][0];
+        }
+        else {
+          $priceFieldExtras = NULL;
+        }
+
+        if ($priceFieldExtras) {
+          if (isset($elements[$index]->_text) && $elements[$index]->_text != '') {
+            $elements[$index]->_text .= getRecurringContributionLabel($priceFieldExtras, $updatedPriceFields);
+          }
+          if (isset($elements[$index]->_label) && $elements[$index]->_label != '') {
+            $elements[$index]->_label .= getRecurringContributionLabel($priceFieldExtras, $updatedPriceFields);
+          }
+        }
+
+      }
+    }
+    elseif (($element instanceof HTML_QuickForm_group) && isset($element->_elements)) {
+      updatePricefieldElements($element->_elements, $totalPriceFields, $updatedPriceFields);
+    }
+  }
+}
+
+/**
+ * @param $priceFieldExtras
+ */
+function getRecurringContributionLabel($priceFieldExtras, &$updatedPriceFields) {
+  if (!$priceFieldExtras['create_individual_contribution']) {
+    return '';
+  }
+
+  $interval = $priceFieldExtras['recurring_contribution_interval'];
+  $intervalUnits = $priceFieldExtras['recurring_contribution_unit'];
+  $updatedPriceFields++;
+
+  if ($interval > 1) {
+    $intervalUnits = $intervalUnits . 's';
+  }
+
+  return ' (Contribute every ' . $interval . ' ' . $intervalUnits . ')';
+}
+
+/**
  * Add contribution related fields on Option value form and price field form.
  * @param $formName
  * @param $form
@@ -195,6 +253,17 @@ function pricesetfrequency_civicrm_buildForm($formName, &$form) {
   if ($form->_action != CRM_Core_Action::DELETE) {
     if ($formName == "CRM_Price_Form_Option") {
       addContributionFormFields($form);
+    }
+
+    if ($formName == "CRM_Contribute_Form_Contribution_Main") {
+      $elements = $form->_elements;
+      $updatedPriceFields = 0;
+      $totalPriceFields = 0;
+      updatePricefieldElements($elements, $totalPriceFields, $updatedPriceFields);
+      if ($totalPriceFields == $updatedPriceFields) {
+        // Remove recurring option
+
+      }
     }
 
     if ($formName == 'CRM_Price_Form_Field') {
