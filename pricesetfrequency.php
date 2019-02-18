@@ -186,6 +186,37 @@ function addContributionFormFields(&$form) {
 }
 
 /**
+ * Get recurring label of price field.
+ *
+ * @param $priceFieldId
+ * @param $totalPriceFields
+ * @param $updatedPriceFields
+ * @return string
+ * @throws CiviCRM_API3_Exception
+ */
+function getPriceFieldRecurringLabel($priceFieldId, &$totalPriceFields, &$updatedPriceFields) {
+  $totalPriceFields++;
+  $priceFieldExtras = civicrm_api3('PricesetIndividualContribution', 'get', array(
+    'price_field_value_id' => $priceFieldId,
+    'sequential'     => TRUE,
+  ));
+
+  if (count($priceFieldExtras['values']) > 0) {
+    $priceFieldExtras = $priceFieldExtras['values'][0];
+  }
+  else {
+    $priceFieldExtras = NULL;
+  }
+
+  if ($priceFieldExtras) {
+    return getRecurringContributionLabel($priceFieldExtras, $updatedPriceFields);
+  }
+
+  return '';
+}
+
+/**
+ * Update price field element labels on Main Form.
  * @param $elements
  */
 function updatePricefieldElements(&$elements, &$totalPriceFields, &$updatedPriceFields) {
@@ -194,32 +225,64 @@ function updatePricefieldElements(&$elements, &$totalPriceFields, &$updatedPrice
       $priceValue = str_replace("\"", "", trim($element->_attributes['price'], "[]\""));
       $priceField = explode(",", $priceValue);
       if (count($priceField) > 0) {
-        $totalPriceFields++;
-        $priceFieldExtras = civicrm_api3('PricesetIndividualContribution', 'get', array(
-          'price_field_value_id' => $priceField[0],
-          'sequential'     => TRUE,
-        ));
-
-        if (count($priceFieldExtras['values']) > 0) {
-          $priceFieldExtras = $priceFieldExtras['values'][0];
+        if (isset($elements[$index]->_text) && $elements[$index]->_text != '') {
+          $elements[$index]->_text .= getPriceFieldRecurringLabel($priceField[0], $totalPriceFields, $updatedPriceFields);
         }
-        else {
-          $priceFieldExtras = NULL;
+        if (isset($elements[$index]->_label) && $elements[$index]->_label != '') {
+          $elements[$index]->_label .= getPriceFieldRecurringLabel($priceField[0], $totalPriceFields, $updatedPriceFields);
         }
-
-        if ($priceFieldExtras) {
-          if (isset($elements[$index]->_text) && $elements[$index]->_text != '') {
-            $elements[$index]->_text .= getRecurringContributionLabel($priceFieldExtras, $updatedPriceFields);
-          }
-          if (isset($elements[$index]->_label) && $elements[$index]->_label != '') {
-            $elements[$index]->_label .= getRecurringContributionLabel($priceFieldExtras, $updatedPriceFields);
-          }
-        }
-
       }
     }
     elseif (($element instanceof HTML_QuickForm_group) && isset($element->_elements)) {
       updatePricefieldElements($element->_elements, $totalPriceFields, $updatedPriceFields);
+    }
+  }
+}
+
+/**
+ * Update is recurring text on main form.
+ * @param $elements
+ * @param $totalPriceFields
+ * @param $updatedPriceFields
+ */
+function updateIsRecurringText(&$elements, &$form, $totalPriceFields, $updatedPriceFields) {
+  $recurringIndex = -1;
+
+  foreach ($elements as $index => $element) {
+    if (isset($element->_attributes) && isset($element->_attributes['name'])) {
+      if ($element->_attributes['name'] == 'is_recur') {
+        $recurringIndex = $index;
+      }
+    }
+  }
+  if ($recurringIndex > 0) {
+    if ($totalPriceFields == $updatedPriceFields) {
+      // Remove recurring option
+      $form->assign('one_frequency_unit', 1);
+      $form->assign('is_recur_interval', 0);
+      $elements[$recurringIndex]->_label = 'I want to contribute this amount on selected intervals.';
+    }
+    elseif ($updatedPriceFields > 0) {
+      // Change checkbox label and make it readonly.
+      $elements[$recurringIndex]->_label = 'I want to contribute this amount on selected intervals and rest of them on ';
+    }
+  }
+}
+
+/**
+ * Update labels of all line items.
+ *
+ * @param $lineItems
+ * @param $totalPriceFields
+ * @param $updatedPriceFields
+ * @throws CiviCRM_API3_Exception
+ */
+function updatePricesetFieldLabels(&$lineItems, &$totalPriceFields, &$updatedPriceFields) {
+  foreach ($lineItems as $lineItemId => $priceFields) {
+    foreach ($priceFields as $priceFieldId => $priceField) {
+      if (isset($priceField['price_field_id']) && !empty($priceField['price_field_id'])) {
+        $lineItems[$lineItemId][$priceFieldId]['label'] .= getPriceFieldRecurringLabel($priceField['price_field_value_id'], $totalPriceFields, $updatedPriceFields);
+      }
     }
   }
 }
@@ -244,6 +307,17 @@ function getRecurringContributionLabel($priceFieldExtras, &$updatedPriceFields) 
 }
 
 /**
+ * Alter fields for an event registration to make them into a demo form.
+ */
+function pricesetfrequency_civicrm_alterContent(&$content, $context, $tplName, &$object) {
+  if ($context == "form") {
+    if ($tplName == "CRM/Contribute/Form/Contribution/Main.tpl") {
+      $content = str_replace(".</label> every", ".</label>", $content);
+    }
+  }
+}
+
+/**
  * Add contribution related fields on Option value form and price field form.
  * @param $formName
  * @param $form
@@ -255,15 +329,23 @@ function pricesetfrequency_civicrm_buildForm($formName, &$form) {
       addContributionFormFields($form);
     }
 
+    if ($formName == "CRM_Contribute_Form_Contribution_Confirm") {
+      $updatedPriceFields = 0;
+      $totalPriceFields = 0;
+      $lineItems = $form->_lineItem;
+      updatePricesetFieldLabels($lineItems, $totalPriceFields, $updatedPriceFields);
+      $form->_lineItem = $lineItems;
+      $form->assign('lineItem', $lineItems);
+
+      // Update I want to contribute text.
+    }
+
     if ($formName == "CRM_Contribute_Form_Contribution_Main") {
       $elements = $form->_elements;
       $updatedPriceFields = 0;
       $totalPriceFields = 0;
       updatePricefieldElements($elements, $totalPriceFields, $updatedPriceFields);
-      if ($totalPriceFields == $updatedPriceFields) {
-        // Remove recurring option
-
-      }
+      updateIsRecurringText($elements, $form, $totalPriceFields, $updatedPriceFields);
     }
 
     if ($formName == 'CRM_Price_Form_Field') {
