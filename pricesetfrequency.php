@@ -222,8 +222,12 @@ function getPriceFieldRecurringLabel($priceFieldId, &$totalPriceFields, &$update
 function updatePricefieldElements(&$elements, &$totalPriceFields, &$updatedPriceFields) {
   foreach ($elements as $index => $element) {
     if (isset($element->_attributes) && isset($element->_attributes['price'])) {
-      $priceValue = str_replace("\"", "", trim($element->_attributes['price'], "[]\""));
+      $priceValue = str_replace("\"", "", trim($element->_attributes['price'], "[]|\""));
       $priceField = explode(",", $priceValue);
+      if (strpos($priceField[0], "price_") !== FALSE) {
+        $priceField[0] = 0;
+      }
+
       if (count($priceField) > 0) {
         if (isset($elements[$index]->_text) && $elements[$index]->_text != '') {
           $elements[$index]->_text .= getPriceFieldRecurringLabel($priceField[0], $totalPriceFields, $updatedPriceFields);
@@ -256,15 +260,10 @@ function updateIsRecurringText(&$elements, &$form, $totalPriceFields, $updatedPr
     }
   }
   if ($recurringIndex > 0) {
-    if ($totalPriceFields == $updatedPriceFields) {
-      // Remove recurring option
+    if ($updatedPriceFields > 0) {
+      $elements[$recurringIndex]->_label = 'I confirm that the above recurring contributions can be billed to my credit card.';
       $form->assign('one_frequency_unit', 1);
       $form->assign('is_recur_interval', 0);
-      $elements[$recurringIndex]->_label = 'I want to contribute this amount on selected intervals.';
-    }
-    elseif ($updatedPriceFields > 0) {
-      // Change checkbox label and make it readonly.
-      $elements[$recurringIndex]->_label = 'I want to contribute this amount on selected intervals and rest of them on ';
     }
   }
 }
@@ -313,6 +312,7 @@ function pricesetfrequency_civicrm_alterContent(&$content, $context, $tplName, &
   if ($context == "form") {
     if ($tplName == "CRM/Contribute/Form/Contribution/Main.tpl") {
       $content = str_replace(".</label> every", ".</label>", $content);
+      $content = str_replace("</span>\n\n</label> every", "</span></label>", $content);
     }
   }
 }
@@ -415,6 +415,22 @@ function pricesetfrequency_civicrm_validateForm($formName, &$fields, &$files, &$
   if ($form->_action != CRM_Core_Action::DELETE) {
     if ($formName == "CRM_Price_Form_Option") {
       validateSingleContributionFormFields($fields, $errors);
+    }
+
+    if ($formName == "CRM_Contribute_Form_Contribution_Main") {
+      $elements = $form->_elements;
+      $updatedPriceFields = 0;
+      $totalPriceFields = 0;
+      updatePricefieldElements($elements, $totalPriceFields, $updatedPriceFields);
+
+      if ($updatedPriceFields > 0) {
+        if (!isset($fields['is_recur']) || !$fields['is_recur']) {
+          $errors['is_recur'] = 'You must accept the recurring contribution consent';
+        }
+
+        $form->setElementError('frequency_interval', NULL);
+      }
+
     }
 
     if ($formName == 'CRM_Price_Form_Field') {
