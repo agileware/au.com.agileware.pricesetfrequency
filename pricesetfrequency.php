@@ -225,14 +225,31 @@ function updatePricefieldElements(&$elements, &$totalPriceFields, &$updatedPrice
       $priceValue = str_replace("\"", "", trim($element->_attributes['price'], "[]|\""));
       $priceField = explode(",", $priceValue);
       if (strpos($priceField[0], "price_") !== FALSE) {
-        $priceField[0] = 0;
+        if (!($element instanceof HTML_QuickForm_radio)) {
+          $priceField[0] = 0;
+        }
+        else {
+          if (isset($element->_attributes) && isset($element->_attributes['value']) && !empty($element->_attributes['value'])) {
+            $priceField[0] = $element->_attributes['value'];
+          }
+          else {
+            $priceField[0] = 0;
+          }
+        }
       }
 
       if (count($priceField) > 0) {
         if (isset($elements[$index]->_text) && $elements[$index]->_text != '') {
           $elements[$index]->_text .= getPriceFieldRecurringLabel($priceField[0], $totalPriceFields, $updatedPriceFields);
         }
-        if (isset($elements[$index]->_label) && $elements[$index]->_label != '') {
+        if (isset($element->_options) && count($element->_options)) {
+          foreach ($element->_options as $optionIndex => $elementOption) {
+            if (isset($elementOption['attr']) && isset($elementOption['attr']['value']) && $elementOption['attr']['value']) {
+              $elements[$index]->_options[$optionIndex]['text'] .= getPriceFieldRecurringLabel($elementOption['attr']['value'], $totalPriceFields, $updatedPriceFields);
+            }
+          }
+        }
+        if (isset($elements[$index]->_label) && !isset($element->_options)  && $elements[$index]->_label != '') {
           $elements[$index]->_label .= getPriceFieldRecurringLabel($priceField[0], $totalPriceFields, $updatedPriceFields);
         }
       }
@@ -241,6 +258,7 @@ function updatePricefieldElements(&$elements, &$totalPriceFields, &$updatedPrice
       updatePricefieldElements($element->_elements, $totalPriceFields, $updatedPriceFields);
     }
   }
+
 }
 
 /**
@@ -290,7 +308,7 @@ function updatePricesetFieldLabels(&$lineItems, &$totalPriceFields, &$updatedPri
  * @param $priceFieldExtras
  */
 function getRecurringContributionLabel($priceFieldExtras, &$updatedPriceFields) {
-  if (!$priceFieldExtras['create_individual_contribution']) {
+  if (!isset($priceFieldExtras['create_individual_contribution']) || !$priceFieldExtras['create_individual_contribution']) {
     return '';
   }
 
@@ -314,6 +332,67 @@ function pricesetfrequency_civicrm_alterContent(&$content, $context, $tplName, &
       $content = str_replace(".</label> every", ".</label>", $content);
       $content = str_replace("</span>\n\n</label> every", "</span></label>", $content);
     }
+
+    if ($tplName == "CRM/Contribute/Form/Contribution/Confirm.tpl") {
+      $content = str_replace("I want to contribute this amount every .", "I agree to the above amounts being regularly charged to my credit card.", $content);
+    }
+    if ($tplName == "CRM/Contribute/Form/Contribution/ThankYou.tpl") {
+      $content = str_replace("This recurring contribution will be automatically processed every .", "The above amounts will be regularly charged to your credit card.", $content);
+    }
+  }
+}
+
+/**
+ * Set price set configuration for Amounts form.
+ *
+ * @param $form
+ * @throws CiviCRM_API3_Exception
+ */
+function setPricesetConfiguration(&$form) {
+  if (isset($form->_elementIndex['price_set_id']) && $form->_elementIndex['price_set_id']) {
+    $priceSetField = $form->_elements[$form->_elementIndex['price_set_id']];
+    $priceSets = array_column(array_column($priceSetField->_options, 'attr'), 'value');
+    $priceSetIndividualContributions = array();
+
+    foreach ($priceSets as $priceSetId) {
+      if ($priceSetId) {
+        $priceFieldValues = civicrm_api3('PriceFieldValue', 'get', [
+          'sequential' => 1,
+          'price_field_id.price_set_id.id' => $priceSetId,
+        ]);
+        $priceFieldValues = $priceFieldValues['values'];
+        foreach ($priceFieldValues as $priceFieldValue) {
+          $priceSetFieldExtras = civicrm_api3('PricesetIndividualContribution', 'get', [
+            'sequential'                     => 1,
+            'price_field_id'                 => $priceFieldValue['price_field_id'],
+            'price_field_value_id'           => $priceFieldValue['id'],
+            'create_individual_contribution' => 1,
+          ]);
+          $priceSetFieldExtras = $priceSetFieldExtras['values'];
+          if (count($priceSetFieldExtras) > 0) {
+            $priceSetIndividualContributions[] = $priceSetId;
+            break;
+          }
+        }
+      }
+    }
+
+    if (isset($priceSetField->_attributes) && isset($priceSetField->_attributes['onchange'])) {
+      $priceSetField->_attributes['onchange'] .= ' showHideRecurringBlockBasedOnPriceSet(this.value);';
+    }
+
+    $defaultPriceSetId = 0;
+    if (isset($form->_defaultValues['price_set_id'])) {
+      $defaultPriceSetId = $form->_defaultValues['price_set_id'];
+    }
+
+    $hideRecurringSection = FALSE;
+    if (in_array($defaultPriceSetId, $priceSetIndividualContributions)) {
+      $hideRecurringSection = TRUE;
+    }
+
+    $form->assign('hideRecurringSection', $hideRecurringSection);
+    $form->assign('priceSetIndividualContribution', $priceSetIndividualContributions);
   }
 }
 
@@ -325,19 +404,26 @@ function pricesetfrequency_civicrm_alterContent(&$content, $context, $tplName, &
  */
 function pricesetfrequency_civicrm_buildForm($formName, &$form) {
   if ($form->_action != CRM_Core_Action::DELETE) {
+    $templatePath = realpath(dirname(__FILE__) . "/templates");
+
     if ($formName == "CRM_Price_Form_Option") {
       addContributionFormFields($form);
     }
 
-    if ($formName == "CRM_Contribute_Form_Contribution_Confirm") {
+    if ($formName == "CRM_Contribute_Form_ContributionPage_Amount") {
+      CRM_Core_Region::instance('contribute-form-contributionpage-amount-post')->add(array(
+        'template' => "{$templatePath}/contribution-page-amount.tpl",
+      ));
+      setPricesetConfiguration($form);
+    }
+
+    if ($formName == "CRM_Contribute_Form_Contribution_Confirm" || $formName == "CRM_Contribute_Form_Contribution_ThankYou") {
       $updatedPriceFields = 0;
       $totalPriceFields = 0;
       $lineItems = $form->_lineItem;
       updatePricesetFieldLabels($lineItems, $totalPriceFields, $updatedPriceFields);
       $form->_lineItem = $lineItems;
       $form->assign('lineItem', $lineItems);
-
-      // Update I want to contribute text.
     }
 
     if ($formName == "CRM_Contribute_Form_Contribution_Main") {
@@ -346,6 +432,12 @@ function pricesetfrequency_civicrm_buildForm($formName, &$form) {
       $totalPriceFields = 0;
       updatePricefieldElements($elements, $totalPriceFields, $updatedPriceFields);
       updateIsRecurringText($elements, $form, $totalPriceFields, $updatedPriceFields);
+      if ($updatedPriceFields) {
+        $defaults = array();
+        $defaults['frequency_interval'] = 0;
+        $defaults['frequency_unit'] = 'week';
+        $form->setDefaults($defaults);
+      }
     }
 
     if ($formName == 'CRM_Price_Form_Field') {
@@ -665,7 +757,12 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
           $newContribution['total_amount'] = $lineItem['line_total'] + $lineItem['tax_amount'];
           $newContribution['net_amount'] = $newContribution['total_amount'];
           $newContribution['tax_amount'] = $lineItem['tax_amount'];
-          $newContribution['contribution_source'] = $invidiaulConfig['contribution_source'];
+          if (isset($invidiaulConfig['contribution_source'])) {
+            $newContribution['contribution_source'] = $invidiaulConfig['contribution_source'];
+          }
+          else {
+            $newContribution['contribution_source'] = '';
+          }
 
           if ($newContribution['total_amount'] != $contribution['total_amount']) {
             unset($newContribution['id']);
