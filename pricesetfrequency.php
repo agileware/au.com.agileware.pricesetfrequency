@@ -517,7 +517,7 @@ function pricesetfrequency_civicrm_validateForm($formName, &$fields, &$files, &$
 
       if ($updatedPriceFields > 0) {
         if (!isset($fields['is_recur']) || !$fields['is_recur']) {
-          $errors['is_recur'] = 'You must accept the recurring contribution consent';
+          $errors['is_recur'] = 'To proceed, you need to confirm the recurring contributions can be billed to your credit card';
         }
 
         $form->setElementError('frequency_interval', NULL);
@@ -692,7 +692,7 @@ function pricesetfrequency_civicrm_postSave_civicrm_price_field_value($dao) {
 }
 
 /**
- * Save the last insert price field value id in statics.
+ * Divide the contributions/recurring contributions.
  * @param $dao
  */
 function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
@@ -759,9 +759,6 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
           $newContribution['tax_amount'] = $lineItem['tax_amount'];
           if (isset($invidiaulConfig['contribution_source'])) {
             $newContribution['contribution_source'] = $invidiaulConfig['contribution_source'];
-          }
-          else {
-            $newContribution['contribution_source'] = '';
           }
 
           if ($newContribution['total_amount'] != $contribution['total_amount']) {
@@ -851,18 +848,29 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
 
     if ($recurringContribution && !$mainRecurringContributionUpdated) {
       civicrm_api3('ContributionRecur', 'create', [
-        'id'     => $recurringContribution['id'],
-        'amount' => $recurringContribution['amount'],
+        'id'                     => $recurringContribution['id'],
+        'amount'                 => $recurringContribution['amount'],
+        'contribution_status_id' => 'Cancelled',
       ]);
     }
 
     if (!$mainContributionUpdated && $updatedLineItems) {
       civicrm_api3('Contribution', 'create', array(
-        'total_amount' => $contribution['total_amount'],
-        'tax_amount'   => $contribution['tax_amount'],
-        'net_amount'   => $contribution['net_amount'],
-        'id'           => $contribution['id'],
+        'total_amount'          => $contribution['total_amount'],
+        'tax_amount'            => $contribution['tax_amount'],
+        'net_amount'            => $contribution['net_amount'],
+        'contribution_recur_id' => 'null',
+        'id'                    => $contribution['id'],
       ));
     }
+  }
+}
+
+/**
+ * Implements hook_civicrm_apiWrappers().
+ */
+function pricesetfrequency_civicrm_apiWrappers(&$wrappers, $apiRequest) {
+  if ($apiRequest['entity'] == 'Contribution' && $apiRequest['action'] == 'completetransaction') {
+    $wrappers[] = new CRM_Pricesetfrequency_APIWrappers_ContributionTransactionWrapper();
   }
 }
