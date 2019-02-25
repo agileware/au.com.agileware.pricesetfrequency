@@ -761,7 +761,7 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
             $newContribution['contribution_source'] = $invidiaulConfig['contribution_source'];
           }
 
-          if ($newContribution['total_amount'] != $contribution['total_amount']) {
+          if (number_format(floatval($newContribution['total_amount']), 6) != number_format(floatval($contribution['total_amount']), 6)) {
             unset($newContribution['id']);
             unset($newContribution['contribution_id']);
             unset($newContribution['contribution_recur_id']);
