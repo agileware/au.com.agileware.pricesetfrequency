@@ -31,12 +31,6 @@
   </field>
 
   <field>
-    <name>create_individual_contribution</name>
-    <title>Create Individual Contribution</title>
-    <type>boolean</type>
-  </field>
-
-  <field>
     <name>recurring_contribution_unit</name>
     <title>Recurring Contribution Unit</title>
     <type>varchar</type>

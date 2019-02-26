@@ -84,7 +84,6 @@ CREATE TABLE `civicrm_priceset_individual_contribution` (
      `id` int unsigned NOT NULL AUTO_INCREMENT  COMMENT 'Unique PricesetIndividualContribution ID',
      `price_field_id` int unsigned    COMMENT 'FK to PriceField',
      `price_field_value_id` int unsigned    COMMENT 'FK to PriceFieldValue',
-     `create_individual_contribution` tinyint    ,
      `recurring_contribution_unit` varchar(8)   DEFAULT 'month' COMMENT 'Time units for recurrence of payment.',
      `contribution_source` varchar(255)   DEFAULT NULL COMMENT 'Source of individual contribution.',
      `recurring_contribution_interval` int unsigned NOT NULL   COMMENT 'Number of time units for recurrence of payment.' 

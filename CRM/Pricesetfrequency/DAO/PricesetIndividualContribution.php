@@ -50,11 +50,6 @@ class CRM_Pricesetfrequency_DAO_PricesetIndividualContribution extends CRM_Core_
   public $price_field_value_id;
 
   /**
-   * @var boolean
-   */
-  public $create_individual_contribution;
-
-  /**
    * Time units for recurrence of payment.
    *
    * @var string
@@ -130,15 +125,6 @@ class CRM_Pricesetfrequency_DAO_PricesetIndividualContribution extends CRM_Core_
           'name' => 'price_field_value_id',
           'type' => CRM_Utils_Type::T_INT,
           'description' => CRM_Pricesetfrequency_ExtensionUtil::ts('FK to PriceFieldValue'),
-          'table_name' => 'civicrm_priceset_individual_contribution',
-          'entity' => 'PricesetIndividualContribution',
-          'bao' => 'CRM_Pricesetfrequency_DAO_PricesetIndividualContribution',
-          'localizable' => 0,
-        ],
-        'create_individual_contribution' => [
-          'name' => 'create_individual_contribution',
-          'type' => CRM_Utils_Type::T_BOOLEAN,
-          'title' => CRM_Pricesetfrequency_ExtensionUtil::ts('Create Individual Contribution'),
           'table_name' => 'civicrm_priceset_individual_contribution',
           'entity' => 'PricesetIndividualContribution',
           'bao' => 'CRM_Pricesetfrequency_DAO_PricesetIndividualContribution',
