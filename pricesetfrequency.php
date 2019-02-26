@@ -294,8 +294,26 @@ function updateIsRecurringText(&$elements, &$form, $totalPriceFields, $updatedPr
 function updatePricesetFieldLabels(&$lineItems, &$totalPriceFields, &$updatedPriceFields) {
   foreach ($lineItems as $lineItemId => $priceFields) {
     foreach ($priceFields as $priceFieldId => $priceField) {
-      if (isset($priceField['price_field_id']) && !empty($priceField['price_field_id'])) {
+      if (isset($priceField['price_field_value_id']) && !empty($priceField['price_field_value_id'])) {
         $lineItems[$lineItemId][$priceFieldId]['label'] .= getPriceFieldRecurringLabel($priceField['price_field_value_id'], $totalPriceFields, $updatedPriceFields);
+      }
+    }
+  }
+}
+
+/**
+ * Get line items count having individual recurrence.
+ *
+ * @param $lineItems
+ * @param $totalPriceFields
+ * @param $updatedPriceFields
+ * @throws CiviCRM_API3_Exception
+ */
+function getLinesItemsCountOfIndividualRecurrence(&$priceSets, &$totalPriceFields, &$updatedPriceFields) {
+  foreach ($priceSets as $priceSetId => $priceFields) {
+    if (isset($priceFields['options'])) {
+      foreach ($priceFields['options'] as $priceFieldOptionId => $priceFieldOption) {
+        getPriceFieldRecurringLabel($priceFieldOption['id'], $totalPriceFields, $updatedPriceFields);
       }
     }
   }
@@ -394,6 +412,24 @@ function setPricesetConfiguration(&$form) {
 }
 
 /**
+ * Set recurring by default if any price field has individual recurring.
+ * @param $formName
+ * @param $form
+ */
+function pricesetfrequency_civicrm_preProcess($formName, &$form) {
+  if ($formName == "CRM_Contribute_Form_Contribution_Main") {
+    if (isset($form->_values) && isset($form->_values['fee'])) {
+      $totalPriceFields = 0;
+      $updatedPriceFields = 0;
+      getLinesItemsCountOfIndividualRecurrence($form->_values['fee'], $totalPriceFields, $updatedPriceFields);
+      if ($updatedPriceFields > 0) {
+        $form->_values['is_recur'] = 1;
+      }
+    }
+  }
+}
+
+/**
  * Add contribution related fields on Option value form and price field form.
  * @param $formName
  * @param $form
@@ -432,7 +468,8 @@ function pricesetfrequency_civicrm_buildForm($formName, &$form) {
       if ($updatedPriceFields) {
         $defaults = array();
         $defaults['frequency_interval'] = 0;
-        $defaults['frequency_unit'] = 'week';
+        $defaults['frequency_unit'] = '';
+        $form->assign('frequency_unit', '');
         $form->setDefaults($defaults);
       }
     }
