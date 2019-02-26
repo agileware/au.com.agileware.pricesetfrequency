@@ -742,6 +742,7 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
     $lineItems = civicrm_api3('LineItem', 'get', [
       'sequential'      => 1,
       'contribution_id' => $dao->id,
+      'price_field_id'  => array('!=' => '1'),
       'return' => ["id", "entity_table", "entity_id", "contribution_id", "price_field_id", "label", "qty", "unit_price", "line_total", "participant_count", "price_field_value_id", "financial_type_id", "non_deductible_amount", "tax_amount"],
     ]);
 
