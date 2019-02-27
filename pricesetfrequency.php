@@ -426,6 +426,7 @@ function pricesetfrequency_civicrm_preProcess($formName, &$form) {
         $form->_values['is_recur'] = 1;
       }
     }
+    $form->_expressButtonName = 'eWayRecurring';
   }
 }
 
