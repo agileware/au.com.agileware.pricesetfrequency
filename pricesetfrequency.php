@@ -777,11 +777,17 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
           'price_field_value_id' => $priceFieldValuId,
         ));
         if (isset($invidiaulConfig['recurring_contribution_unit']) && $invidiaulConfig['recurring_contribution_unit']) {
+          if (!isset($contribution['tax_amount']) || $contribution['tax_amount'] == '') {
+            $contribution['tax_amount'] = 0;
+          }
+
           $newContribution = $contribution;
 
-          $newContribution['total_amount'] = $lineItem['line_total'] + $lineItem['tax_amount'];
+          $lineItemTaxAmount = (isset($lineItem['tax_amount']) && $lineItem['tax_amount'] != '') ? $lineItem['tax_amount'] : 0;
+
+          $newContribution['total_amount'] = $lineItem['line_total'] + $lineItemTaxAmount;
           $newContribution['net_amount'] = $newContribution['total_amount'];
-          $newContribution['tax_amount'] = $lineItem['tax_amount'];
+          $newContribution['tax_amount'] = $lineItemTaxAmount;
           if (isset($invidiaulConfig['contribution_source'])) {
             $newContribution['contribution_source'] = $invidiaulConfig['contribution_source'];
           }
