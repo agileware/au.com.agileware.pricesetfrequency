@@ -16,7 +16,7 @@
     </div>
 </div>
 
-<div class="crm-price-field-form-block-recurring-contribution-interval">
+<div class="crm-price-field-form-block-recurring-contribution-interval" style="display: none;">
     <div class="label"><label for="recurring_contribution_interval">  Recurring Contribution Interval</label></div>
     <div>
         {$form.recurring_contribution_interval.html}
@@ -67,6 +67,7 @@
 
             unitCell.html(cj('.price_field_option_extra_' + index).find('.price_field_option_recur_contribution_unit').html());
             intervalCell.html(cj('.price_field_option_extra_' + index).find('.price_field_option_recur_contribution_interval').html());
+            intervalCell.find('input').hide();
             sourceCell.html(cj('.price_field_option_extra_' + index).find('.price_field_option_recur_contribution_source').html());
 
             if (index != 0) {
@@ -90,6 +91,24 @@
         insertAfterClass = '.crm-price-option-form-block-amount';
     }
 
+    cj('body').on('change', 'select[name="recurring_contribution_unit"]', function(e){
+       if (cj(this).val() != '') {
+           cj('.crm-price-field-form-block-recurring-contribution-interval').show();
+       }
+       else{
+           cj('.crm-price-field-form-block-recurring-contribution-interval').hide();
+       }
+    });
+
+    cj('body').on('change', 'select[name^="option_recurring_contribution_unit"]', function(e){
+        if (cj(this).val() != '') {
+            cj(this).parent().parent().find('input[name^="option_recurring_contribution_interval"]').show();
+        }
+        else{
+            cj(this).parent().parent().find('input[name^="option_recurring_contribution_interval"]').hide();
+        }
+    });
+
     for (var i = 0; i < classesToShift.length; i++) {
         var inConClass = classesToShift[i];
         cj(inConClass).insertAfter(insertAfterClass);
@@ -98,7 +117,15 @@
         existingHTML = existingHTML.replace(/<div/g,"<td");
         existingHTML = existingHTML.replace(/<\/div>/g,"</td>");
         var classToAdd = inConClass.substr(1);
-        cj(inConClass).replaceWith('<tr class="'+classToAdd+'">' + existingHTML + '</tr>');
+        var stylesToAdd = "";
+        if (classToAdd == 'crm-price-field-form-block-recurring-contribution-interval') {
+            stylesToAdd = 'display: none';
+        }
+        cj(inConClass).replaceWith('<tr class="'+classToAdd+'" style="'+stylesToAdd+'">' + existingHTML + '</tr>');
+    }
+
+    if (cj('select[name="recurring_contribution_unit"]').val() != '') {
+        cj('.crm-price-field-form-block-recurring-contribution-interval').show();
     }
 
 </script>
