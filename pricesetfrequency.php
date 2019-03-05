@@ -369,28 +369,7 @@ function setPricesetConfiguration(&$form) {
     $priceSets = array_column(array_column($priceSetField->_options, 'attr'), 'value');
     $priceSetIndividualContributions = array();
 
-    foreach ($priceSets as $priceSetId) {
-      if ($priceSetId) {
-        $priceFieldValues = civicrm_api3('PriceFieldValue', 'get', [
-          'sequential' => 1,
-          'price_field_id.price_set_id.id' => $priceSetId,
-        ]);
-        $priceFieldValues = $priceFieldValues['values'];
-        foreach ($priceFieldValues as $priceFieldValue) {
-          $priceSetFieldExtras = civicrm_api3('PricesetIndividualContribution', 'get', [
-            'sequential'                     => 1,
-            'price_field_id'                 => $priceFieldValue['price_field_id'],
-            'price_field_value_id'           => $priceFieldValue['id'],
-            'recurring_contribution_unit' => ['!=' => ""],
-          ]);
-          $priceSetFieldExtras = $priceSetFieldExtras['values'];
-          if (count($priceSetFieldExtras) > 0) {
-            $priceSetIndividualContributions[] = $priceSetId;
-            break;
-          }
-        }
-      }
-    }
+    checkPriceSetsRecurrence($priceSets, $priceSetIndividualContributions);
 
     if (isset($priceSetField->_attributes) && isset($priceSetField->_attributes['onchange'])) {
       $priceSetField->_attributes['onchange'] .= ' showHideRecurringBlockBasedOnPriceSet(this.value);';
@@ -406,8 +385,70 @@ function setPricesetConfiguration(&$form) {
       $hideRecurringSection = TRUE;
     }
 
+    $form->assign('isMembershipPriceSetSelected', FALSE);
+
+    if (!$hideRecurringSection) {
+      verifyMembershipPriceSets($hideRecurringSection, $priceSetIndividualContributions, $form);
+    }
+
     $form->assign('hideRecurringSection', $hideRecurringSection);
     $form->assign('priceSetIndividualContribution', $priceSetIndividualContributions);
+  }
+}
+
+/**
+ * Check if price set is set for individual recurrence.
+ *
+ * @param $priceSets
+ * @param $priceSetIndividualContributions
+ * @throws CiviCRM_API3_Exception
+ */
+function checkPriceSetsRecurrence($priceSets, &$priceSetIndividualContributions) {
+  foreach ($priceSets as $priceSetId) {
+    if ($priceSetId) {
+      $priceFieldValues = civicrm_api3('PriceFieldValue', 'get', [
+        'sequential' => 1,
+        'price_field_id.price_set_id.id' => $priceSetId,
+      ]);
+      $priceFieldValues = $priceFieldValues['values'];
+      foreach ($priceFieldValues as $priceFieldValue) {
+        $priceSetFieldExtras = civicrm_api3('PricesetIndividualContribution', 'get', [
+          'sequential'                     => 1,
+          'price_field_id'                 => $priceFieldValue['price_field_id'],
+          'price_field_value_id'           => $priceFieldValue['id'],
+          'recurring_contribution_unit' => ['!=' => ""],
+        ]);
+        $priceSetFieldExtras = $priceSetFieldExtras['values'];
+        if (count($priceSetFieldExtras) > 0) {
+          $priceSetIndividualContributions[] = $priceSetId;
+          break;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Verify membership pricesets.
+ *
+ * @param $hideRecurringSection
+ * @param $priceSetIndividualContributions
+ * @param $form
+ */
+function verifyMembershipPriceSets(&$hideRecurringSection, &$priceSetIndividualContributions, &$form) {
+  $membershipPriceSets = civicrm_api3('PriceSet', 'get', [
+    'sequential' => 1,
+    'return'     => ["id"],
+    'extends'    => "CiviMember",
+  ]);
+
+  $membershipPriceSets = $membershipPriceSets['values'];
+  $membershipPriceSets = array_column($membershipPriceSets, 'id');
+  checkPriceSetsRecurrence($membershipPriceSets, $priceSetIndividualContributions);
+  $priceSetId = CRM_Price_BAO_PriceSet::getFor('civicrm_contribution_page', $form->_defaultValues['id'], NULL);
+  if (in_array($priceSetId, $priceSetIndividualContributions)) {
+    $hideRecurringSection = TRUE;
+    $form->assign('isMembershipPriceSetSelected', TRUE);
   }
 }
 

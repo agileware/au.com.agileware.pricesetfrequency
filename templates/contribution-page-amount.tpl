@@ -2,7 +2,7 @@
     <table class="form-layout-compressed">
         <tbody>
             <tr>
-                <td><p>Recurring options are disabled because the selected a Price Set which contains a Price Field with a recurring frequency enabled.</p></td>
+                <td><p>Recurring options are disabled because the selected a {if $isMembershipPriceSetSelected}Membership{/if} Price Set which contains a Price Field with a recurring frequency enabled.</p></td>
             </tr>
         </tbody>
     </table>
