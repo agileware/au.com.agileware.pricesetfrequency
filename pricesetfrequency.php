@@ -191,7 +191,7 @@ function addContributionFormFields(&$form) {
  * @return string
  * @throws CiviCRM_API3_Exception
  */
-function getPriceFieldRecurringLabel($priceFieldId, &$totalPriceFields, &$updatedPriceFields) {
+function getPriceFieldRecurringLabel($priceFieldId, &$totalPriceFields, &$updatedPriceFields, $forValidation = FALSE) {
   $totalPriceFields++;
   $priceFieldExtras = civicrm_api3('PricesetIndividualContribution', 'get', array(
     'price_field_value_id' => $priceFieldId,
@@ -206,7 +206,7 @@ function getPriceFieldRecurringLabel($priceFieldId, &$totalPriceFields, &$update
   }
 
   if ($priceFieldExtras) {
-    return getRecurringContributionLabel($priceFieldExtras, $updatedPriceFields);
+    return getRecurringContributionLabel($priceFieldExtras, $updatedPriceFields, $forValidation);
   }
 
   return '';
@@ -216,7 +216,7 @@ function getPriceFieldRecurringLabel($priceFieldId, &$totalPriceFields, &$update
  * Update price field element labels on Main Form.
  * @param $elements
  */
-function updatePricefieldElements(&$elements, &$totalPriceFields, &$updatedPriceFields) {
+function updatePricefieldElements(&$elements, &$totalPriceFields, &$updatedPriceFields, $forValidation = FALSE) {
   foreach ($elements as $index => $element) {
     if (isset($element->_attributes) && isset($element->_attributes['price'])) {
       $priceValue = str_replace("\"", "", trim($element->_attributes['price'], "[]|\""));
@@ -237,17 +237,17 @@ function updatePricefieldElements(&$elements, &$totalPriceFields, &$updatedPrice
 
       if (count($priceField) > 0) {
         if (isset($elements[$index]->_text) && $elements[$index]->_text != '') {
-          $elements[$index]->_text .= getPriceFieldRecurringLabel($priceField[0], $totalPriceFields, $updatedPriceFields);
+          $elements[$index]->_text .= getPriceFieldRecurringLabel($priceField[0], $totalPriceFields, $updatedPriceFields, $forValidation);
         }
         if (isset($element->_options) && count($element->_options)) {
           foreach ($element->_options as $optionIndex => $elementOption) {
             if (isset($elementOption['attr']) && isset($elementOption['attr']['value']) && $elementOption['attr']['value']) {
-              $elements[$index]->_options[$optionIndex]['text'] .= getPriceFieldRecurringLabel($elementOption['attr']['value'], $totalPriceFields, $updatedPriceFields);
+              $elements[$index]->_options[$optionIndex]['text'] .= getPriceFieldRecurringLabel($elementOption['attr']['value'], $totalPriceFields, $updatedPriceFields, $forValidation);
             }
           }
         }
         if (isset($elements[$index]->_label) && !isset($element->_options)  && $elements[$index]->_label != '') {
-          $elements[$index]->_label .= getPriceFieldRecurringLabel($priceField[0], $totalPriceFields, $updatedPriceFields);
+          $elements[$index]->_label .= getPriceFieldRecurringLabel($priceField[0], $totalPriceFields, $updatedPriceFields, $forValidation);
         }
       }
     }
@@ -322,7 +322,7 @@ function getLinesItemsCountOfIndividualRecurrence(&$priceSets, &$totalPriceField
 /**
  * @param $priceFieldExtras
  */
-function getRecurringContributionLabel($priceFieldExtras, &$updatedPriceFields) {
+function getRecurringContributionLabel($priceFieldExtras, &$updatedPriceFields, $forValidation = FALSE) {
   if (!isset($priceFieldExtras['recurring_contribution_unit']) || !$priceFieldExtras['recurring_contribution_unit']) {
     return '';
   }
@@ -333,6 +333,10 @@ function getRecurringContributionLabel($priceFieldExtras, &$updatedPriceFields) 
 
   if ($interval > 1) {
     $intervalUnits = $intervalUnits . 's';
+  }
+
+  if ($forValidation) {
+    return '';
   }
 
   return ' (Contribute every ' . $interval . ' ' . $intervalUnits . ')';
@@ -472,6 +476,33 @@ function pricesetfrequency_civicrm_preProcess($formName, &$form) {
 }
 
 /**
+ * Set membership interval and duration if auto renew membership type is selected.
+ *
+ * @param $form
+ * @throws CiviCRM_API3_Exception
+ */
+function setMembershipIntervalAndDuration(&$form) {
+  $lineItems = $form->_lineItem;
+  foreach ($lineItems as $lineItemId => $priceFields) {
+    foreach ($priceFields as $priceFieldId => $priceField) {
+      if (isset($priceField['membership_type_id']) && !empty($priceField['membership_type_id']) && ($priceField['auto_renew'] == 1 || $priceField['auto_renew'] == 2)) {
+        $membershipType = civicrm_api3('MembershipType', 'get', array(
+          'id'         => $priceField['membership_type_id'],
+          'sequential' => 1,
+        ));
+        $membershipType = $membershipType['values'];
+        if (count($membershipType)) {
+          $membershipType = $membershipType[0];
+          $form->_params['frequency_interval'] = $membershipType['duration_interval'];
+          $form->_params['frequency_unit'] = $membershipType['duration_unit'];
+          return;
+        }
+      }
+    }
+  }
+}
+
+/**
  * Add contribution related fields on Option value form and price field form.
  * @param $formName
  * @param $form
@@ -499,6 +530,11 @@ function pricesetfrequency_civicrm_buildForm($formName, &$form) {
       updatePricesetFieldLabels($lineItems, $totalPriceFields, $updatedPriceFields);
       $form->_lineItem = $lineItems;
       $form->assign('lineItem', $lineItems);
+      if ($formName == "CRM_Contribute_Form_Contribution_Confirm") {
+        if (isset($form->_params['auto_renew']) && $form->_params['auto_renew']) {
+          setMembershipIntervalAndDuration($form);
+        }
+      }
     }
 
     if ($formName == "CRM_Contribute_Form_Contribution_Main") {
@@ -571,6 +607,24 @@ function validateSingleContributionFormFields($fields, &$errors) {
 }
 
 /**
+ * Check if membership with auto renew available on the page.
+ *
+ * @param $form
+ * @return bool
+ */
+function hasAutoRenewMembershipsOnForm($form) {
+  $membershipTypes = $form->_membershipTypeValues;
+  if (is_array($membershipTypes)) {
+    foreach ($membershipTypes as $membershipType) {
+      if (isset($membershipType['auto_renew']) && $membershipType['auto_renew']) {
+        return TRUE;
+      }
+    }
+  }
+  return FALSE;
+}
+
+/**
  * Validate option value form and price field form.
  *
  * @param $formName
@@ -590,11 +644,15 @@ function pricesetfrequency_civicrm_validateForm($formName, &$fields, &$files, &$
       $elements = $form->_elements;
       $updatedPriceFields = 0;
       $totalPriceFields = 0;
-      updatePricefieldElements($elements, $totalPriceFields, $updatedPriceFields);
+      updatePricefieldElements($elements, $totalPriceFields, $updatedPriceFields, TRUE);
 
       if ($updatedPriceFields > 0) {
         if (!isset($fields['is_recur']) || !$fields['is_recur']) {
           $errors['is_recur'] = 'To proceed, you need to confirm the recurring contributions can be billed to your credit card';
+        }
+
+        if (hasAutoRenewMembershipsOnForm($form) && (!isset($fields['auto_renew']) || !$fields['auto_renew'])) {
+          $errors['auto_renew'] = 'To proceed, you need to confirm the membership renewal.';
         }
 
         $form->setElementError('frequency_interval', NULL);
@@ -919,22 +977,41 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
       }
     }
 
+    $recurringAttachedWithMembership = TRUE;
     if ($recurringContribution && !$mainRecurringContributionUpdated) {
-      civicrm_api3('ContributionRecur', 'create', [
+
+      $memberships = civicrm_api3('Membership', 'get', array(
+        'contribution_recur_id' => $recurringContribution['id'],
+        'sequential'            => 1,
+      ));
+      $memberships = count($memberships['values']);
+
+      $recurringContributionParams = array(
         'id'                     => $recurringContribution['id'],
         'amount'                 => $recurringContribution['amount'],
-        'contribution_status_id' => 'Cancelled',
-      ]);
+      );
+      if ($memberships == 0) {
+        $recurringAttachedWithMembership = FALSE;
+        $recurringContributionParams['contribution_status_id'] = 'Cancelled';
+      }
+
+      civicrm_api3('ContributionRecur', 'create', $recurringContributionParams);
     }
 
     if (!$mainContributionUpdated && $updatedLineItems) {
-      civicrm_api3('Contribution', 'create', array(
+
+      $contributionParams = array(
         'total_amount'          => $contribution['total_amount'],
         'tax_amount'            => $contribution['tax_amount'],
         'net_amount'            => $contribution['net_amount'],
-        'contribution_recur_id' => 'null',
         'id'                    => $contribution['id'],
-      ));
+      );
+
+      if (!$recurringAttachedWithMembership) {
+        $contributionParams['contribution_recur_id'] = 'null';
+      }
+
+      civicrm_api3('Contribution', 'create', $contributionParams);
     }
   }
 }
