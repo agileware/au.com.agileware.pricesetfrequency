@@ -472,6 +472,21 @@ function pricesetfrequency_civicrm_preProcess($formName, &$form) {
       }
     }
     $form->_expressButtonName = 'eWayRecurring';
+  } elseif ($formName == "CRM_Contribute_Form_Contribution_Confirm") {
+    // set the frequency of initial recurring contribution to the first line item
+    $priceSet = reset($form->_lineItem);
+    $firstPriceField = reset($priceSet);
+    try {
+      $individualConfig = civicrm_api3('PricesetIndividualContribution', 'getsingle', [
+        'price_field_id' => $firstPriceField['price_field_id'],
+        'price_field_value_id' => $firstPriceField['price_field_value_id'],
+      ]);
+    } catch (CiviCRM_API3_Exception $e) {
+      // don't do anything if not found
+      return;
+    }
+    $form->_params['frequency_interval'] = $individualConfig['recurring_contribution_interval'];
+    $form->_params['frequency_unit'] = $individualConfig['recurring_contribution_unit'];
   }
 }
 
@@ -545,9 +560,9 @@ function pricesetfrequency_civicrm_buildForm($formName, &$form) {
       updateIsRecurringText($elements, $form, $totalPriceFields, $updatedPriceFields);
       if ($updatedPriceFields) {
         $defaults = array();
-        $defaults['frequency_interval'] = 0;
-        $defaults['frequency_unit'] = '';
-        $form->assign('frequency_unit', '');
+        // this will be replaced in the preProcess hook of contribution confirm form
+        $defaults['frequency_interval'] = 1;
+        $defaults['frequency_unit'] = 'month';
         $form->setDefaults($defaults);
       }
     }
