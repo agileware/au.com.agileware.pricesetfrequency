@@ -252,7 +252,7 @@ function updatePricefieldElements(&$elements, &$totalPriceFields, &$updatedPrice
       }
     }
     elseif (($element instanceof HTML_QuickForm_group) && isset($element->_elements)) {
-      updatePricefieldElements($element->_elements, $totalPriceFields, $updatedPriceFields);
+      updatePricefieldElements($element->_elements, $totalPriceFields, $updatedPriceFields, $forValidation);
     }
   }
 
