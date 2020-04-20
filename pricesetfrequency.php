@@ -564,6 +564,8 @@ function pricesetfrequency_civicrm_buildForm($formName, &$form) {
         $defaults['frequency_interval'] = 1;
         $defaults['frequency_unit'] = 'month';
         $form->setDefaults($defaults);
+        // let custom template knows this is using frequency price set
+        $form->assign('is_freq_priceset', TRUE);
       }
     }
 
