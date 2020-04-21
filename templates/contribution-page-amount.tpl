@@ -1,5 +1,5 @@
 <div id="recurringFieldsDisabled" class="help">
-    Recurring options are disabled because the selected a {if $isMembershipPriceSetSelected}Membership{/if} Price Set which contains a Price Field with a recurring frequency enabled.
+    {ts}Recurring options are disabled because the selected a {if $isMembershipPriceSetSelected}Membership{/if} Price Set which contains a Price Field with a recurring frequency enabled.{/ts}
 </div>
 {literal}
     <script>
