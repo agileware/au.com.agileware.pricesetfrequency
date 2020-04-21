@@ -543,6 +543,22 @@ function pricesetfrequency_civicrm_buildForm($formName, &$form) {
       $totalPriceFields = 0;
       $lineItems = $form->_lineItem;
       updatePricesetFieldLabels($lineItems, $totalPriceFields, $updatedPriceFields);
+      // Replace the section that displays the recurring schedule.
+      // We have the schedule displayed on each line item
+      if ($updatedPriceFields) {
+        CRM_Core_Region::instance('contribution-thankyou-recur')->update('default', [
+          'disabled' => TRUE,
+        ]);
+        CRM_Core_Region::instance('contribution-thankyou-recur')->add([
+          'template' => "{$templatePath}/contribution-thankyou-recur-region.tpl"
+        ]);
+        CRM_Core_Region::instance('contribution-confirm-recur')->update('default', [
+          'disabled' => TRUE,
+        ]);
+        CRM_Core_Region::instance('contribution-confirm-recur')->add([
+          'template' => "{$templatePath}/contribution-confirm-recur-region.tpl"
+        ]);
+      }
       $form->_lineItem = $lineItems;
       $form->assign('lineItem', $lineItems);
       if ($formName == "CRM_Contribute_Form_Contribution_Confirm") {
