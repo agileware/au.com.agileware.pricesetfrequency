@@ -1,15 +1,9 @@
-<div id="recurringFieldsDisabled">
-    <table class="form-layout-compressed">
-        <tbody>
-            <tr>
-                <td><p>Recurring options are disabled because the selected a {if $isMembershipPriceSetSelected}Membership{/if} Price Set which contains a Price Field with a recurring frequency enabled.</p></td>
-            </tr>
-        </tbody>
-    </table>
+<div id="recurringFieldsDisabled" class="help">
+    Recurring options are disabled because the selected a {if $isMembershipPriceSetSelected}Membership{/if} Price Set which contains a Price Field with a recurring frequency enabled.
 </div>
 {literal}
     <script>
-        cj("#recurringFieldsDisabled").insertAfter('#recurringFields');
+        cj('.crm-block.crm-form-block.crm-contribution-contributionpage-amount-form-block').prepend(cj("#recurringFieldsDisabled"));
 
         {/literal}
             {if $hideRecurringSection}

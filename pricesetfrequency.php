@@ -769,6 +769,33 @@ function savePriceFieldOptionExtras($fieldId, $optionId, &$form) {
  */
 function pricesetfrequency_civicrm_postProcess($formName, &$form) {
   if ($form->_action != CRM_Core_Action::DELETE) {
+    if ($formName == 'CRM_Contribute_Form_ContributionPage_Amount') {
+      // check if this page use frequency priceset or not
+      $submits = $form->getVar('_submitValues');
+      if (!$submits['price_set_id']) {
+        return;
+      }
+      $result = civicrm_api3('PriceField', 'get', [
+        'sequential' => 1,
+        'price_set_id' => $submits['price_set_id'],
+        'api.PricesetIndividualContribution.getcount' => ['price_field_id' => "\$value.id"],
+      ]);
+      $isFrequencyPriceset = FALSE;
+      foreach ($result['values'] as $priceField) {
+        if ($priceField['api.PricesetIndividualContribution.getcount']) {
+          // any of the price field contains frequency settings will work
+          $isFrequencyPriceset = TRUE;
+          break;
+        }
+      }
+      if ($isFrequencyPriceset) {
+        civicrm_api3('ContributionPage', 'create', [
+          'id' => $form->getVar('_id'),
+          'recur_frequency_unit' => ''
+        ]);
+      }
+    }
+
     if ($formName == "CRM_Price_Form_Option" && isset(Civi::$statics['inserted_price_field_value_id'])) {
 
       $fieldId = $form->getVar('_fid');
