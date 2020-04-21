@@ -3,7 +3,7 @@
 </div>
 {literal}
     <script>
-        cj('.crm-block.crm-form-block.crm-contribution-contributionpage-amount-form-block').prepend(cj("#recurringFieldsDisabled"));
+        cj("#recurringFieldsDisabled").insertAfter('#recurringFields');
 
         {/literal}
             {if $hideRecurringSection}
