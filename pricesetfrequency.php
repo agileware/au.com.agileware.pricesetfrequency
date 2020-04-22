@@ -573,8 +573,25 @@ function pricesetfrequency_civicrm_buildForm($formName, &$form) {
         $defaults['frequency_interval'] = 1;
         $defaults['frequency_unit'] = 'month';
         $form->setDefaults($defaults);
-        // let custom template knows this is using frequency price set
         $form->assign('is_freq_priceset', TRUE);
+
+        $priceFieldExtras = civicrm_api3('PricesetIndividualContribution', 'get', array(
+          'price_set_id' => $form->get('priceSetId'),
+          'sequential'   => TRUE,
+          'options'      => [ 'limit' => 0 ]
+        ))['values'];
+
+        $priceFieldSettings = [];
+
+        foreach($priceFieldExtras as $extra) {
+          $priceFieldSettings[$extra['price_field_value_id']] = [
+            'frequencyUnit' => $extra['recurring_contribution_unit'],
+            'frequencyInterval' => $extra['recurring_contribution_interval'],
+          ];
+        }
+
+        CRM_Core_Resources::singleton()->addVars('priceSetFrequency', $priceFieldSettings);
+
       }
     }
 
