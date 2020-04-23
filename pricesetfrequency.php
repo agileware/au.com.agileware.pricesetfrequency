@@ -465,21 +465,6 @@ function pricesetfrequency_civicrm_preProcess($formName, &$form) {
       }
     }
     $form->_expressButtonName = 'eWayRecurring';
-  } elseif ($formName == "CRM_Contribute_Form_Contribution_Confirm") {
-    // set the frequency of initial recurring contribution to the first line item
-    $priceSet = reset($form->_lineItem);
-    $firstPriceField = reset($priceSet);
-    try {
-      $individualConfig = civicrm_api3('PricesetIndividualContribution', 'getsingle', [
-        'price_field_id' => $firstPriceField['price_field_id'],
-        'price_field_value_id' => $firstPriceField['price_field_value_id'],
-      ]);
-    } catch (CiviCRM_API3_Exception $e) {
-      // don't do anything if not found
-      return;
-    }
-    $form->_params['frequency_interval'] = $individualConfig['recurring_contribution_interval'];
-    $form->_params['frequency_unit'] = $individualConfig['recurring_contribution_unit'];
   }
 }
 
@@ -917,7 +902,55 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
     ]);
 
     $lineItems = $lineItems['values'];
-    if (count($lineItems) <= 1) {
+    if (count($lineItems) == 0) {
+      return;
+    }
+    elseif (count($lineItems) == 1) {
+      // update the recurring schedule
+      $lineItem = array_shift($lineItems);
+      $priceFieldId = $lineItem['price_field_id'];
+      $priceFieldValueId = $lineItem['price_field_value_id'];
+      try {
+        $invidiaulConfig = civicrm_api3('PricesetIndividualContribution', 'getsingle', [
+          'price_field_id' => $priceFieldId,
+          'price_field_value_id' => $priceFieldValueId,
+        ]);
+      } catch (CiviCRM_API3_Exception $e) {
+        return;
+      }
+      if (isset($invidiaulConfig['recurring_contribution_unit']) && $invidiaulConfig['recurring_contribution_unit']) {
+        try {
+          $recurringContribution = civicrm_api3('ContributionRecur', 'get', [
+            'id' => $contribution['contribution_recur_id'],
+            'sequential' => TRUE,
+          ]);
+        } catch (CiviCRM_API3_Exception $e) {
+        }
+        if (empty($recurringContribution) || $recurringContribution['count'] <= 0) {
+          return;
+        }
+        $recurringContribution = $recurringContribution['values'][0];
+        // check if the frequency already correct
+        if ($recurringContribution['frequency_unit'] == $invidiaulConfig['recurring_contribution_unit'] &&
+        $recurringContribution['frequency_interval'] == $invidiaulConfig['recurring_contribution_interval']) {
+          return;
+        }
+        $recurringContribution['frequency_unit'] = $invidiaulConfig['recurring_contribution_unit'];
+        $recurringContribution['frequency_interval'] = $invidiaulConfig['recurring_contribution_interval'];
+
+        $nextDate = new DateTime(date('Y-m-d 00:00:00'));
+        $nextDate->modify("+{$invidiaulConfig['recurring_contribution_interval']} " .
+          "{$invidiaulConfig['recurring_contribution_unit']}s");
+
+        $recurringContribution['next_sched_contribution_date'] = $nextDate->format("Y-m-d H:i:s");
+        $recurringContribution['next_sched_contribution'] = $nextDate->format("Y-m-d H:i:s");
+
+        try {
+          civicrm_api3('ContributionRecur', 'create', $recurringContribution);
+        } catch (CiviCRM_API3_Exception $e) {
+        }
+      }
+
       return;
     }
 
@@ -939,12 +972,12 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
 
     foreach ($lineItems as $lineItem) {
       $priceFieldId = $lineItem['price_field_id'];
-      $priceFieldValuId = $lineItem['price_field_value_id'];
+      $priceFieldValueId = $lineItem['price_field_value_id'];
 
       try {
         $invidiaulConfig = civicrm_api3('PricesetIndividualContribution', 'getsingle', array(
           'price_field_id' => $priceFieldId,
-          'price_field_value_id' => $priceFieldValuId,
+          'price_field_value_id' => $priceFieldValueId,
         ));
         if (isset($invidiaulConfig['recurring_contribution_unit']) && $invidiaulConfig['recurring_contribution_unit']) {
           if (!isset($contribution['tax_amount']) || $contribution['tax_amount'] == '') {
