@@ -277,7 +277,7 @@ class CRM_Pricesetfrequency_Contribution {
   }
 
   /**
-   * We just want to unlink and delete the recurring contribution here
+   * Unlink and cancel the recurring contribution here
    *
    * @param $contribution array
    *
@@ -292,7 +292,7 @@ class CRM_Pricesetfrequency_Contribution {
     try {
       $contribution = civicrm_api3('Contribution', 'create', $contribution);
       $contribution = reset($contribution['values']);
-      if ($contributionRecurID && $this->lineItemCount == 1) {
+      if ($contributionRecurID) {
         civicrm_api3('ContributionRecur', 'create', [
           'id' => $contributionRecurID,
           'contribution_status_id' => 'Cancelled',

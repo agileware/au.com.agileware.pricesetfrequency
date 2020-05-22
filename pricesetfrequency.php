@@ -653,6 +653,41 @@ function hasAutoRenewMembershipsOnForm($form) {
 }
 
 /**
+ * Return true if the selected price field has frequency settings
+ * @param $fields form values when submitting
+ *
+ * @return bool
+ */
+function pricesetfrequency_fields_has_frequency($fields) {
+  foreach($fields as $key => $value) {
+    if (strpos($key, 'price_') === FALSE) {
+      continue;
+    }
+    $priceField = explode('_', $key)[1];
+    // unify the format
+    if (!is_array($value)) {
+      $value = [$value => 1];
+    }
+    foreach($value as $priceValueID => $amount) {
+      try {
+        $individualContribution = civicrm_api3('PricesetIndividualContribution', 'getsingle', [
+          'price_field_id' => $priceField,
+          'price_field_value_id' => $priceValueID,
+          'sequential' => TRUE,
+        ]);
+      } catch (CiviCRM_API3_Exception $e) {
+        continue;
+      }
+      if ($individualContribution['recurring_contribution_unit']
+        && $individualContribution['recurring_contribution_interval']) {
+        return TRUE;
+      }
+    }
+  }
+  return FALSE;
+}
+
+/**
  * Validate option value form and price field form.
  *
  * @param $formName
@@ -675,9 +710,12 @@ function pricesetfrequency_civicrm_validateForm($formName, &$fields, &$files, &$
       updatePricefieldElements($elements, $totalPriceFields, $updatedPriceFields, TRUE);
 
       if ($updatedPriceFields > 0) {
-        if (!isset($fields['is_recur']) || !$fields['is_recur']) {
+        if (pricesetfrequency_fields_has_frequency($fields) && empty($fields['is_recur'])) {
           $errors['is_recur'] = E::ts('To proceed, you need to confirm the recurring contributions can be billed to your credit card');
+        } elseif (!pricesetfrequency_fields_has_frequency($fields) && !empty($fields['is_recur'])) {
+          $errors['is_recur'] = E::ts('Your selection is a one-off contribution. Please uncheck this.');
         }
+
 
         if (hasAutoRenewMembershipsOnForm($form) && (!isset($fields['auto_renew']) || !$fields['auto_renew'])) {
           $errors['auto_renew'] = E::ts('To proceed, you need to confirm the membership renewal.');
