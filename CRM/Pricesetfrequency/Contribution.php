@@ -40,7 +40,7 @@ class CRM_Pricesetfrequency_Contribution {
    */
   private $lineItemCount;
 
-  private $lineItemGroupCount = 0;
+  private $lineItemsGroupCount = 0;
 
   private $lineItemProcessed = 0;
 
@@ -65,7 +65,7 @@ class CRM_Pricesetfrequency_Contribution {
    * 4. send receipt for extra contributions
    */
   public function process() {
-    if ($this->lineItemGroupCount == 1) {
+    if ($this->lineItemsGroupCount == 1) {
       $this->isFinished = TRUE;
       return;
     }
@@ -74,7 +74,7 @@ class CRM_Pricesetfrequency_Contribution {
     we don't want the source contribution be replaced when there are recurring
     item in the set.
     */
-    if ($this->lineItemGroupCount > 1 && $this->lineItems['one-off']) {
+    if ($this->lineItemsGroupCount > 1 && $this->lineItems['one-off']) {
       $one_off = $this->lineItems['one-off'];
       $this->lineItems = ['one-off' => $one_off] + $this->lineItems;
     }
