@@ -40,6 +40,8 @@ class CRM_Pricesetfrequency_Contribution {
    */
   private $lineItemCount;
 
+  private $lineItemGroupCount = 0;
+
   private $lineItemProcessed = 0;
 
 
@@ -60,22 +62,10 @@ class CRM_Pricesetfrequency_Contribution {
    * 1. create/update the contribution and link the corresponding line items
    * 2. create/update the recurring contribution
    * 3. link membership to the correct recurring contribution for auto-renew
+   * 4. send receipt for extra contributions
    */
   public function process() {
-    // fix the wrong schedule for single line item contribution
-    if ($this->lineItemCount == 1) {
-      if ($this->lineItems['one-off']) {
-        $lineItems = $this->lineItems['one-off'];
-        $contribution = $this->processOneOffContribution($this->sourceContribution);
-      }
-      else {
-        $value = reset($this->lineItems);
-        $unit = key($this->lineItems);
-        $lineItems = reset($value);
-        $interval = key($value);
-        $contribution = $this->processRecurringContribution($unit, $interval, $this->sourceContribution);
-      }
-      $this->processMembership($contribution, $lineItems);
+    if ($this->lineItemGroupCount == 1) {
       $this->isFinished = TRUE;
       return;
     }
@@ -84,7 +74,7 @@ class CRM_Pricesetfrequency_Contribution {
     we don't want the source contribution be replaced when there are recurring
     item in the set.
     */
-    if (count($this->lineItems) > 1 && $this->lineItems['one-off']) {
+    if ($this->lineItemGroupCount > 1 && $this->lineItems['one-off']) {
       $one_off = $this->lineItems['one-off'];
       $this->lineItems = ['one-off' => $one_off] + $this->lineItems;
     }
@@ -107,12 +97,29 @@ class CRM_Pricesetfrequency_Contribution {
         }
       }
     }
+    // send receipt for each additional contribution
+    foreach ($this->contributions as $contribution) {
+      if ($contribution['id'] != $this->sourceContribution['id']
+        && empty($contribution['receipt_date'])) {
+        try {
+          civicrm_api3('Contribution', 'sendconfirmation', [
+            'id' => $contribution['id'],
+            'payment_processor_id' => $this->sourceContributionRecur['payment_processor_id'],
+            'receipt_update' => 1,
+          ]);
+        } catch (CiviCRM_API3_Exception $e) {
+          $this->logError('Failed to send receipt for additional contribution.', $e);
+        }
+      }
+    }
     $this->isFinished = TRUE;
   }
 
   /**
-   * This was used to prevent infinity loop, but it is now done by static field check
-   * Still using this function to save computation power, however, safe to remove it
+   * This was used to prevent infinity loop, but it is now done by static field
+   * check Still using this function to save computation power, however, safe
+   * to remove it
+   *
    * @return bool
    */
   private function isScheduleCorrect() {
@@ -204,6 +211,13 @@ class CRM_Pricesetfrequency_Contribution {
       $lineItemsGroup['one-off'][] = $lineItem;
     }
     $this->lineItems = $lineItemsGroup;
+    foreach ($lineItemsGroup as $frequency => $value) {
+      if ($frequency == 'one-off') {
+        $this->lineItemsGroupCount++;
+      } else {
+        $this->lineItemsGroupCount += count($value);
+      }
+    }
 
     // recurring contribution
     if (!empty($this->sourceContribution['contribution_recur_id'])) {
@@ -256,6 +270,7 @@ class CRM_Pricesetfrequency_Contribution {
     }
 
     $contribution['skipLineItem'] = 1;
+    $contribution['financial_type_id'] = $lineItems[0]['financial_type_id'];
 
     try {
       $contribution = civicrm_api3('Contribution', 'create', $contribution);
@@ -303,11 +318,13 @@ class CRM_Pricesetfrequency_Contribution {
       return NULL;
     }
     $this->storeContribution($contribution);
+
     return $contribution;
   }
 
   /**
    * Update the schedule or create new recurring contribution
+   *
    * @param $unit string
    * @param $interval string|int
    * @param $contribution array
@@ -317,6 +334,7 @@ class CRM_Pricesetfrequency_Contribution {
   private function processRecurringContribution($unit, $interval, $contribution) {
     $contributionRecur = $this->sourceContributionRecur;
     if (!$contribution['contribution_recur_id']) {
+      // unset id to create new record
       unset($contributionRecur['id']);
     }
     unset($contributionRecur['trxn_id']);
@@ -337,6 +355,7 @@ class CRM_Pricesetfrequency_Contribution {
 
     try {
       $contributionRecur = civicrm_api3('ContributionRecur', 'create', $contributionRecur);
+      $contributionRecur = array_shift($contributionRecur['values']);
     } catch (CiviCRM_API3_Exception $e) {
       $this->logError('Failed to create recurring contribution.', $e);
       return NULL;
@@ -372,9 +391,27 @@ class CRM_Pricesetfrequency_Contribution {
         $membership = civicrm_api3('Membership', 'getsingle', [
           'id' => $lineItem['entity_id'],
         ]);
+        $membershipPayment = civicrm_api3('MembershipPayment', 'get', [
+          'membership_id' => $lineItem['entity_id'],
+          'contribution_id' => $this->sourceContribution['id'],
+          'options' => ['limit' => 0],
+        ]);
       } catch (CiviCRM_API3_Exception $e) {
         $this->logError('Failed to get the membership.', $e);
         continue;
+      }
+      if ($membershipPayment['count']) {
+        foreach ($membershipPayment['values'] as $mp) {
+          if ($mp['contribution_id'] != $contribution['id']) {
+            $mp['contribution_id'] = $contribution['id'];
+            try {
+              civicrm_api3('MembershipPayment', 'create', $mp);
+            } catch (CiviCRM_API3_Exception $e) {
+              $this->logError('Failed to update membership payment.', $e);
+              continue;
+            }
+          }
+        }
       }
       if ($membership['contribution_recur_id'] == $contribution['contribution_recur_id']) {
         $memberships[] = $membership;
@@ -395,6 +432,7 @@ class CRM_Pricesetfrequency_Contribution {
 
   /**
    * Check if it is the last contribution for the grouped line items
+   *
    * @param $lineItemCount int
    *
    * @return bool
