@@ -279,12 +279,14 @@ class CRM_Pricesetfrequency_Contribution {
       $this->logError('Failed to create contribution.', $e);
       return NULL;
     }
+    $contribution['is_membership'] = FALSE;
     $this->storeContribution($contribution);
 
     // update line items to link to the new contribution
     foreach ($lineItems as $lineItem) {
       CRM_Core_DAO::setFieldValue('CRM_Price_DAO_LineItem', $lineItem['id'], 'contribution_id', $contribution['id']);
       CRM_Core_DAO::setFieldValue('CRM_Price_DAO_LineItem', $lineItem['id'], 'entity_id', $contribution['id']);
+      $contribution['_is_membership'] |= ('civicrm_membership' == $lineItem['entity_table']);
       $this->lineItemProcessed++;
     }
 
@@ -342,6 +344,7 @@ class CRM_Pricesetfrequency_Contribution {
     $contributionRecur['amount'] = $contribution['total_amount'];
     $contributionRecur['frequency_unit'] = $unit;
     $contributionRecur['frequency_interval'] = $interval;
+    $contributionRecur['auto_renew'] = $contribution['_is_membership'];
     // next billing date
     try {
       $nextDate = new DateTime(date('Y-m-d 00:00:00'));
