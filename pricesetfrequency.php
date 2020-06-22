@@ -462,6 +462,7 @@ function pricesetfrequency_civicrm_preProcess($formName, &$form) {
       getLinesItemsCountOfIndividualRecurrence($form->_values['fee'], $totalPriceFields, $updatedPriceFields);
       if ($updatedPriceFields > 0) {
         $form->_values['is_recur'] = 1;
+        Civi::$statics[E::LONG_NAME]['defer_recurringNotify'] = TRUE;
       }
     }
     $form->_expressButtonName = 'eWayRecurring';
@@ -931,5 +932,15 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
 function pricesetfrequency_civicrm_apiWrappers(&$wrappers, $apiRequest) {
   if ($apiRequest['entity'] == 'Contribution' && $apiRequest['action'] == 'completetransaction') {
     $wrappers[] = new CRM_Pricesetfrequency_APIWrappers_ContributionTransactionWrapper();
+  }
+}
+
+/**
+ * Implements hook_civicrm_alterMailParams().
+ */
+function pricesetfrequency_civicrm_alterMailParams(&$params, $context) {
+  if (isset($params['valueName']) && ($params['valueName'] == 'contribution_recurring_notify') && !empty(Civi::$statics[E::LONG_NAME]['defer_recurringNotify']) && ($context == 'singleEmail')) {
+    $params['abortMailSend'] = TRUE;
+    Civi::log()->info('Found priceset frequencies, deferring recurring contribution notification email.');
   }
 }

@@ -69,8 +69,13 @@ class CRM_Pricesetfrequency_Contribution {
       $this->isFinished = TRUE;
       return;
     }
+
+    /* Reset parameters for recurringNotify */
+    $autoRenewMembership = FALSE;
+    $recurContributionId = 0;
+
     /*
-    Cause the last thing to be processed will replace the source contribution,
+    Because the last thing to be processed will replace the source contribution,
     we don't want the source contribution be replaced when there are recurring
     item in the set.
     */
@@ -92,7 +97,14 @@ class CRM_Pricesetfrequency_Contribution {
           $contribution = $this->processContribution($lineItems);
           if ($contribution) {
             $contribution = $this->processRecurringContribution($unit, $interval, $contribution);
-            $this->processMembership($contribution, $lineItems);
+            $memberships = $this->processMembership($contribution, $lineItems);
+            if((!$recurContributionId || !$autoRenewMembership) && count($memberships)) {
+              $autoRenewMembership = TRUE;
+              $recurContributionId = $contribution['contribution_recur_id'];
+            }
+            elseif (!$recurContributionId && !$autoRenewMembership) {
+              $recurContributionId = $contribution['contribution_recur_id'];
+            }
           }
         }
       }
@@ -112,7 +124,24 @@ class CRM_Pricesetfrequency_Contribution {
         }
       }
     }
+
     $this->isFinished = TRUE;
+
+    Civi::$statics[E::LONG_NAME]['defer_recurringNotify'] = FALSE;
+
+    if($recurContributionId) {
+      $recurringContribution = new CRM_Contribute_BAO_ContributionRecur();
+      $recurringContribution->id = $recurContributionId;
+      $recurringContribution->find(true);
+
+      CRM_Contribute_BAO_ContributionPage::recurringNotify(
+        CRM_Core_Payment::RECURRING_PAYMENT_START,
+        $contribution['contact_id'],
+        $contribution['contribution_page_id'] ?? NULL,
+        $recurringContribution,
+        $autoRenewMembership
+      );
+    }
   }
 
   /**
