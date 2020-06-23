@@ -84,6 +84,16 @@ class CRM_Pricesetfrequency_Contribution {
       $this->lineItems = ['one-off' => $one_off] + $this->lineItems;
     }
 
+    try {
+      civicrm_api3('Contribution', 'sendconfirmation', [
+        'id' => $this->sourceContribution['id'],
+        'payment_processor_id' => ($this->sourceContributionRecur['payment_processor_id'] ?? NULL),
+        'receipt_update' => 1,
+      ]);
+    } catch (CiviCRM_API3_Exception $e) {
+      $this->logError('Failed to send receipt.', $e);
+    }
+
     foreach ($this->lineItems as $unit => $value) {
       if ($unit == 'one-off') {
         $contribution = $this->processContribution($value);
@@ -109,21 +119,6 @@ class CRM_Pricesetfrequency_Contribution {
         }
       }
     }
-    // send receipt for each additional contribution
-    foreach ($this->contributions as $contribution) {
-      if ($contribution['id'] != $this->sourceContribution['id']
-        && empty($contribution['receipt_date'])) {
-        try {
-          civicrm_api3('Contribution', 'sendconfirmation', [
-            'id' => $contribution['id'],
-            'payment_processor_id' => $this->sourceContributionRecur['payment_processor_id'],
-            'receipt_update' => 1,
-          ]);
-        } catch (CiviCRM_API3_Exception $e) {
-          $this->logError('Failed to send receipt for additional contribution.', $e);
-        }
-      }
-    }
 
     $this->isFinished = TRUE;
 
@@ -142,6 +137,8 @@ class CRM_Pricesetfrequency_Contribution {
         $autoRenewMembership
       );
     }
+
+    CRM_Core_DAO::setFieldValue('CRM_Contribute_BAO_Contribution', $this->sourceContribution['id'], 'is_receipt_email', FALSE);
   }
 
   /**
