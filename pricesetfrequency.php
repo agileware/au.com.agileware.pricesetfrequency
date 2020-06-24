@@ -939,8 +939,23 @@ function pricesetfrequency_civicrm_apiWrappers(&$wrappers, $apiRequest) {
  * Implements hook_civicrm_alterMailParams().
  */
 function pricesetfrequency_civicrm_alterMailParams(&$params, $context) {
-  if (isset($params['valueName']) && ($params['valueName'] == 'contribution_recurring_notify') && !empty(Civi::$statics[E::LONG_NAME]['defer_recurringNotify']) && ($context == 'singleEmail')) {
-    $params['abortMailSend'] = TRUE;
-    Civi::log()->info('Found priceset frequencies, deferring recurring contribution notification email.');
+  if (!isset($params['valueName']))
+    return;
+
+  switch($params['valueName']) {
+    case 'contribution_recurring_notify':
+      if(!empty(Civi::$statics[E::LONG_NAME]['defer_recurringNotify']) && ($context == 'singleEmail')) {
+        $params['abortMailSend'] = TRUE;
+        Civi::log()->info('Found priceset frequencies, deferring recurring contribution notification email.');
+      }
+      break;
+    case 'contribution_online_receipt':
+      $contribution_id = $params['tplParams']['contributionID'];
+      if(!empty(Civi::$statics[E::LONG_NAME]['receipt_sent'][$contribution_id]) && ($context == 'singleEmail')) {
+        $params['abortMailSend'] = TRUE;
+      }
+      break;
+  }
+}
   }
 }

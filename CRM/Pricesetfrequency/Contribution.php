@@ -90,6 +90,7 @@ class CRM_Pricesetfrequency_Contribution {
         'payment_processor_id' => ($this->sourceContributionRecur['payment_processor_id'] ?? NULL),
         'receipt_update' => 1,
       ]);
+      Civi::$statics[E::LONG_NAME]['receipt_sent'][$this->sourceContribution['id']] = TRUE;
     } catch (CiviCRM_API3_Exception $e) {
       $this->logError('Failed to send receipt.', $e);
     }
@@ -138,7 +139,6 @@ class CRM_Pricesetfrequency_Contribution {
       );
     }
 
-    CRM_Core_DAO::setFieldValue('CRM_Contribute_BAO_Contribution', $this->sourceContribution['id'], 'is_receipt_email', FALSE);
   }
 
   /**
