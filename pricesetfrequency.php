@@ -957,5 +957,14 @@ function pricesetfrequency_civicrm_alterMailParams(&$params, $context) {
       break;
   }
 }
+
+/**
+ * Implements hook_civicrm_pre().
+ */
+function pricesetfrequency_civicrm_pre($op, $objectName, $id, &$params) {
+  if(($objectName == 'Activity') &&
+     (($op == 'create') || ($op == 'edit')) &&
+     !empty(Civi::$statics[E::LONG_NAME]['activity_subject'][$id])) {
+    $params['subject'] = Civi::$statics[E::LONG_NAME]['activity_subject'][$id];
   }
 }

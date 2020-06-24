@@ -139,6 +139,7 @@ class CRM_Pricesetfrequency_Contribution {
       );
     }
 
+    $this->updateActivitySubject();
   }
 
   /**
@@ -492,5 +493,27 @@ class CRM_Pricesetfrequency_Contribution {
     Civi::log()->alert($message);
     Civi::log()->error($e->getMessage());
     $this->isError = TRUE;
+  }
+
+  /**
+   * Update the subject line of the initially created Activity.
+   */
+  private function updateActivitySubject() {
+    $contribution = new CRM_Contribute_BAO_Contribution();
+    $contribution->id = $this->sourceContribution['id'];
+    if($contribution->find(TRUE)) {
+      $activityParams = [ 'source_record_id' => $contribution->id,
+                          'activity_type_id' => 'Contribution' ];
+      try {
+        $activity = civicrm_api3('Activity', 'getsingle', $activityParams);
+        $subject = CRM_Activity_BAO_Activity::getActivitySubject($contribution);
+        Civi::$statics[E::LONG_NAME]['activity_subject'][$activity['id']] = $subject;
+      }
+      catch(CiviCRM_API3_Exception $e) {
+        Civi::log()->warning('Could not update activity subject',
+                             [ 'message' => $e->getMessage(),
+                               'trace'   => CRM_Core_Error::formatBacktrace($e->getTrace()) ]);
+      }
+    }
   }
 }
