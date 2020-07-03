@@ -950,6 +950,7 @@ function pricesetfrequency_civicrm_alterMailParams(&$params, $context) {
       }
       break;
     case 'contribution_online_receipt':
+    case 'membership_online_receipt':
       $contribution_id = $params['tplParams']['contributionID'];
       if(!empty(Civi::$statics[E::LONG_NAME]['receipt_sent'][$contribution_id]) && ($context == 'singleEmail')) {
         $params['abortMailSend'] = TRUE;
