@@ -185,7 +185,7 @@ class CRM_Pricesetfrequency_Contribution {
       ]);
       $contributionAddtionalFields = civicrm_api3('Contribution', 'getsingle', [
         'id' => $contributionID,
-        'return' => ['contribution_page_id'],
+        'return' => ['contribution_page_id', 'is_template'],
       ]);
     } catch (CiviCRM_API3_Exception $e) {
       $this->logError('Failed to get the contribution.', $e);
