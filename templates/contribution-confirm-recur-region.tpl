@@ -1,0 +1,2 @@
+<p><strong>{ts}The recurring contribution will be automatically processed with the given schedule.{/ts}</strong></p>
+<p>{ts}Your initial contribution will be processed once you complete the confirmation step. You will be able to cancel the recurring contribution by visiting the web page link that will be included in your receipt.{/ts}</p>

@@ -7,27 +7,27 @@
 {/literal}
 
 <div class="crm-price-field-form-block-recurring-contribution-unit">
-    <div class="label"><label for="recurring_contribution_unit">  Recurring Contribution Unit</label></div>
+    <div class="label"><label for="recurring_contribution_unit">  {ts}Recurring Contribution Unit{/ts}</label></div>
     <div>
         {$form.recurring_contribution_unit.html}
         <span class="description">
-            Select individual recurring contribution unit.
+            {ts}Select individual recurring contribution unit.{/ts}
         </span>
     </div>
 </div>
 
 <div class="crm-price-field-form-block-recurring-contribution-interval" style="display: none;">
-    <div class="label"><label for="recurring_contribution_interval">  Recurring Contribution Interval</label></div>
+    <div class="label"><label for="recurring_contribution_interval">  {ts}Recurring Contribution Interval{/ts}</label></div>
     <div>
         {$form.recurring_contribution_interval.html}
         <span class="description">
-            Individual recurring contribution interval
+            {ts}Individual recurring contribution interval{/ts}
         </span>
     </div>
 </div>
 
 <div class="crm-price-field-form-block-individual-contribution-source">
-    <div class="label"><label for="individual_contribution_source">  Contribution Source</label></div>
+    <div class="label"><label for="individual_contribution_source">  {ts}Contribution Source{/ts}</label></div>
     <div>
         {$form.individual_contribution_source.html}
     </div>

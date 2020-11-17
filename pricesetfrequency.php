@@ -141,22 +141,22 @@ function pricesetfrequency_civicrm_entityTypes(&$entityTypes) {
 function addContributionFormFields(&$form) {
   $templatePath = realpath(dirname(__FILE__) . "/templates");
 
-  $form->add('text', 'individual_contribution_source', ts('Contribution Source'));
+  $form->add('text', 'individual_contribution_source', E::ts('Contribution Source'));
 
   $units = array(
-    ''      => ts('No recurrence'),
-    'day'   => ts('day'),
-    'week'  => ts('week'),
-    'month' => ts('month'),
-    'year'  => ts('year'),
+    ''      => E::ts('No recurrence'),
+    'day'   => E::ts('day'),
+    'week'  => E::ts('week'),
+    'month' => E::ts('month'),
+    'year'  => E::ts('year'),
   );
-  $form->add('select', 'recurring_contribution_unit', ts('Recurring Contribution Unit'), $units);
-  $form->add('text', 'recurring_contribution_interval', ts('Recurring Contribution Interval'));
+  $form->add('select', 'recurring_contribution_unit', E::ts('Recurring Contribution Unit'), $units);
+  $form->add('text', 'recurring_contribution_interval', E::ts('Recurring Contribution Interval'));
 
   for ($i = 1; $i <= 15; $i++) {
-    $form->add('select', 'option_recurring_contribution_unit[' . $i . ']', ts('Recurring Contribution Unit'), $units);
-    $form->add('text', 'option_recurring_contribution_interval[' . $i . ']', ts('Recurring Contribution Interval'), array('size' => 5, 'maxlength' => 3));
-    $form->add('text', 'option_individual_contribution_source[' . $i . ']', ts('Contribution Source'), array('size' => 10));
+    $form->add('select', 'option_recurring_contribution_unit[' . $i . ']', E::ts('Recurring Contribution Unit'), $units);
+    $form->add('text', 'option_recurring_contribution_interval[' . $i . ']', E::ts('Recurring Contribution Interval'), array('size' => 5, 'maxlength' => 3));
+    $form->add('text', 'option_individual_contribution_source[' . $i . ']', E::ts('Contribution Source'), array('size' => 10));
   }
 
   $defaults['recurring_contribution_interval'] = '';
@@ -252,7 +252,7 @@ function updatePricefieldElements(&$elements, &$totalPriceFields, &$updatedPrice
       }
     }
     elseif (($element instanceof HTML_QuickForm_group) && isset($element->_elements)) {
-      updatePricefieldElements($element->_elements, $totalPriceFields, $updatedPriceFields);
+      updatePricefieldElements($element->_elements, $totalPriceFields, $updatedPriceFields, $forValidation);
     }
   }
 
@@ -276,7 +276,7 @@ function updateIsRecurringText(&$elements, &$form, $totalPriceFields, $updatedPr
   }
   if ($recurringIndex > 0) {
     if ($updatedPriceFields > 0) {
-      $elements[$recurringIndex]->_label = 'I confirm that the above recurring contributions can be billed to my credit card.';
+      $elements[$recurringIndex]->_label = E::ts('I confirm that the above recurring contributions can be billed to my credit card.');
       $form->assign('one_frequency_unit', 1);
       $form->assign('is_recur_interval', 0);
     }
@@ -350,13 +350,6 @@ function pricesetfrequency_civicrm_alterContent(&$content, $context, $tplName, &
     if ($tplName == "CRM/Contribute/Form/Contribution/Main.tpl") {
       $content = str_replace(".</label> every", ".</label>", $content);
       $content = str_replace("</span>\n\n</label> every", "</span></label>", $content);
-    }
-
-    if ($tplName == "CRM/Contribute/Form/Contribution/Confirm.tpl") {
-      $content = str_replace("I want to contribute this amount every .", "I agree to the above amounts being regularly charged to my credit card.", $content);
-    }
-    if ($tplName == "CRM/Contribute/Form/Contribution/ThankYou.tpl") {
-      $content = str_replace("This recurring contribution will be automatically processed every .", "The above amounts will be regularly charged to your credit card.", $content);
     }
   }
 }
@@ -469,24 +462,10 @@ function pricesetfrequency_civicrm_preProcess($formName, &$form) {
       getLinesItemsCountOfIndividualRecurrence($form->_values['fee'], $totalPriceFields, $updatedPriceFields);
       if ($updatedPriceFields > 0) {
         $form->_values['is_recur'] = 1;
+        Civi::$statics[E::LONG_NAME]['defer_recurringNotify'] = TRUE;
       }
     }
     $form->_expressButtonName = 'eWayRecurring';
-  } elseif ($formName == "CRM_Contribute_Form_Contribution_Confirm") {
-    // set the frequency of initial recurring contribution to the first line item
-    $priceSet = reset($form->_lineItem);
-    $firstPriceField = reset($priceSet);
-    try {
-      $individualConfig = civicrm_api3('PricesetIndividualContribution', 'getsingle', [
-        'price_field_id' => $firstPriceField['price_field_id'],
-        'price_field_value_id' => $firstPriceField['price_field_value_id'],
-      ]);
-    } catch (CiviCRM_API3_Exception $e) {
-      // don't do anything if not found
-      return;
-    }
-    $form->_params['frequency_interval'] = $individualConfig['recurring_contribution_interval'];
-    $form->_params['frequency_unit'] = $individualConfig['recurring_contribution_unit'];
   }
 }
 
@@ -543,6 +522,22 @@ function pricesetfrequency_civicrm_buildForm($formName, &$form) {
       $totalPriceFields = 0;
       $lineItems = $form->_lineItem;
       updatePricesetFieldLabels($lineItems, $totalPriceFields, $updatedPriceFields);
+      // Replace the section that displays the recurring schedule.
+      // We have the schedule displayed on each line item
+      if ($updatedPriceFields) {
+        CRM_Core_Region::instance('contribution-thankyou-recur')->update('default', [
+          'disabled' => TRUE,
+        ]);
+        CRM_Core_Region::instance('contribution-thankyou-recur')->add([
+          'template' => "{$templatePath}/contribution-thankyou-recur-region.tpl"
+        ]);
+        CRM_Core_Region::instance('contribution-confirm-recur')->update('default', [
+          'disabled' => TRUE,
+        ]);
+        CRM_Core_Region::instance('contribution-confirm-recur')->add([
+          'template' => "{$templatePath}/contribution-confirm-recur-region.tpl"
+        ]);
+      }
       $form->_lineItem = $lineItems;
       $form->assign('lineItem', $lineItems);
       if ($formName == "CRM_Contribute_Form_Contribution_Confirm") {
@@ -564,6 +559,25 @@ function pricesetfrequency_civicrm_buildForm($formName, &$form) {
         $defaults['frequency_interval'] = 1;
         $defaults['frequency_unit'] = 'month';
         $form->setDefaults($defaults);
+        $form->assign('is_freq_priceset', TRUE);
+
+        $priceFieldExtras = civicrm_api3('PricesetIndividualContribution', 'get', array(
+          'price_set_id' => $form->get('priceSetId'),
+          'sequential'   => TRUE,
+          'options'      => [ 'limit' => 0 ]
+        ))['values'];
+
+        $priceFieldSettings = [];
+
+        foreach($priceFieldExtras as $extra) {
+          $priceFieldSettings[$extra['price_field_value_id']] = [
+            'frequencyUnit' => $extra['recurring_contribution_unit'],
+            'frequencyInterval' => $extra['recurring_contribution_interval'],
+          ];
+        }
+
+        CRM_Core_Resources::singleton()->addVars('priceSetFrequency', $priceFieldSettings);
+
       }
     }
 
@@ -616,8 +630,8 @@ function setPriceSetContributionDefaultValues($priceFieldExtras, &$form) {
 function validateSingleContributionFormFields($fields, &$errors) {
   $recurringInterval = CRM_Utils_Array::value('recurring_contribution_interval', $fields);
 
-  if ($recurringInterval != '' && (!CRM_Utils_Type::validate($recurringInterval, 'Int', FALSE, ts('Recurring Contribution Interval')) || $recurringInterval < 1)) {
-    $errors['recurring_contribution_interval'] = ts('Recurring Contribution Interval must be a number greater than 1.');
+  if ($recurringInterval != '' && (!CRM_Utils_Type::validate($recurringInterval, 'Int', FALSE, E::ts('Recurring Contribution Interval')) || $recurringInterval < 1)) {
+    $errors['recurring_contribution_interval'] = E::ts('Recurring Contribution Interval must be a number greater than 1.');
   }
 }
 
@@ -632,6 +646,41 @@ function hasAutoRenewMembershipsOnForm($form) {
   if (is_array($membershipTypes)) {
     foreach ($membershipTypes as $membershipType) {
       if (isset($membershipType['auto_renew']) && $membershipType['auto_renew']) {
+        return TRUE;
+      }
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Return true if the selected price field has frequency settings
+ * @param $fields form values when submitting
+ *
+ * @return bool
+ */
+function pricesetfrequency_fields_has_frequency($fields) {
+  foreach($fields as $key => $value) {
+    if (strpos($key, 'price_') === FALSE) {
+      continue;
+    }
+    $priceField = explode('_', $key)[1];
+    // unify the format
+    if (!is_array($value)) {
+      $value = [$value => 1];
+    }
+    foreach($value as $priceValueID => $amount) {
+      try {
+        $individualContribution = civicrm_api3('PricesetIndividualContribution', 'getsingle', [
+          'price_field_id' => $priceField,
+          'price_field_value_id' => $priceValueID,
+          'sequential' => TRUE,
+        ]);
+      } catch (CiviCRM_API3_Exception $e) {
+        continue;
+      }
+      if ($individualContribution['recurring_contribution_unit']
+        && $individualContribution['recurring_contribution_interval']) {
         return TRUE;
       }
     }
@@ -662,12 +711,15 @@ function pricesetfrequency_civicrm_validateForm($formName, &$fields, &$files, &$
       updatePricefieldElements($elements, $totalPriceFields, $updatedPriceFields, TRUE);
 
       if ($updatedPriceFields > 0) {
-        if (!isset($fields['is_recur']) || !$fields['is_recur']) {
-          $errors['is_recur'] = 'To proceed, you need to confirm the recurring contributions can be billed to your credit card';
+        if (pricesetfrequency_fields_has_frequency($fields) && empty($fields['is_recur'])) {
+          $errors['is_recur'] = E::ts('To proceed, you need to confirm the recurring contributions can be billed to your credit card');
+        } elseif (!pricesetfrequency_fields_has_frequency($fields) && !empty($fields['is_recur'])) {
+          $errors['is_recur'] = E::ts('Your selection is a one-off contribution. Please uncheck this.');
         }
 
+
         if (hasAutoRenewMembershipsOnForm($form) && (!isset($fields['auto_renew']) || !$fields['auto_renew'])) {
-          $errors['auto_renew'] = 'To proceed, you need to confirm the membership renewal.';
+          $errors['auto_renew'] = E::ts('To proceed, you need to confirm the membership renewal.');
         }
 
         $form->setElementError('frequency_interval', NULL);
@@ -687,8 +739,8 @@ function pricesetfrequency_civicrm_validateForm($formName, &$fields, &$files, &$
           if ($optionLabel != '' && $optionAmount != '') {
 
             $recurringInterval = $form->getSubmitValue('option_recurring_contribution_interval[' . $i . ']');
-            if ($recurringInterval != '' && (!CRM_Utils_Type::validate($recurringInterval, 'Int', FALSE, ts('Recurring Contribution Interval')) || $recurringInterval < 1)) {
-              $errors['option_recurring_contribution_interval[' . $i . ']'] = ts('Recurring Contribution Interval must be a number greater than 1.');
+            if ($recurringInterval != '' && (!CRM_Utils_Type::validate($recurringInterval, 'Int', FALSE, E::ts('Recurring Contribution Interval')) || $recurringInterval < 1)) {
+              $errors['option_recurring_contribution_interval[' . $i . ']'] = E::ts('Recurring Contribution Interval must be a number greater than 1.');
             }
           }
         }
@@ -751,6 +803,33 @@ function savePriceFieldOptionExtras($fieldId, $optionId, &$form) {
  */
 function pricesetfrequency_civicrm_postProcess($formName, &$form) {
   if ($form->_action != CRM_Core_Action::DELETE) {
+    if ($formName == 'CRM_Contribute_Form_ContributionPage_Amount') {
+      // check if this page use frequency priceset or not
+      $submits = $form->getVar('_submitValues');
+      if (!$submits['price_set_id']) {
+        return;
+      }
+      $result = civicrm_api3('PriceField', 'get', [
+        'sequential' => 1,
+        'price_set_id' => $submits['price_set_id'],
+        'api.PricesetIndividualContribution.getcount' => ['price_field_id' => "\$value.id"],
+      ]);
+      $isFrequencyPriceset = FALSE;
+      foreach ($result['values'] as $priceField) {
+        if ($priceField['api.PricesetIndividualContribution.getcount']) {
+          // any of the price field contains frequency settings will work
+          $isFrequencyPriceset = TRUE;
+          break;
+        }
+      }
+      if ($isFrequencyPriceset) {
+        civicrm_api3('ContributionPage', 'create', [
+          'id' => $form->getVar('_id'),
+          'recur_frequency_unit' => ''
+        ]);
+      }
+    }
+
     if ($formName == "CRM_Price_Form_Option" && isset(Civi::$statics['inserted_price_field_value_id'])) {
 
       $fieldId = $form->getVar('_fid');
@@ -835,200 +914,16 @@ function pricesetfrequency_civicrm_postSave_civicrm_price_field_value($dao) {
  * @param $dao
  */
 function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
-  $contribution = civicrm_api3('Contribution', 'get', array(
-    'id'         => $dao->id,
-    'return'     => ["contribution_source", "contact_id", "financial_type_id", "contribution_page_id", "payment_instrument_id", "receive_date", "non_deductible_amount", "total_amount", "fee_amount", "net_amount", "trxn_id", "invoice_id", "currency", "cancel_date", "cancel_reason", "receipt_date", "thankyou_date", "source", "amount_level", "contribution_recur_id", "is_test", "is_pay_later", "contribution_status_id", "address_id", "check_number", "campaign_id", "creditnote_id", "tax_amount", "revenue_recognition_date"],
-    'sequential' => TRUE,
-  ));
-
-  if (count($contribution['values']) == 0) {
+  if (Civi::$statics[E::LONG_NAME]['contributionProcessor']) {
     return;
   }
-
-  $contribution = $contribution['values'][0];
-
-  $mainContributionUpdated = FALSE;
-  $updatedLineItems = FALSE;
-  $processedContributions = array();
-  $mainRecurringContributionUpdated = FALSE;
-
-  if ($contribution['contribution_status'] == 'Completed' && isset($contribution['contribution_page_id']) && $contribution['contribution_page_id'] != '') {
-
-    $lineItems = civicrm_api3('LineItem', 'get', [
-      'sequential'      => 1,
-      'contribution_id' => $dao->id,
-      'price_field_id'  => array('!=' => '1'),
-      'return' => ["id", "entity_table", "entity_id", "contribution_id", "price_field_id", "label", "qty", "unit_price", "line_total", "participant_count", "price_field_value_id", "financial_type_id", "non_deductible_amount", "tax_amount"],
-    ]);
-
-    $lineItems = $lineItems['values'];
-    if (count($lineItems) <= 1) {
-      return;
-    }
-
-    $recurringContribution = NULL;
-
-    if (isset($contribution['contribution_recur_id']) && $contribution['contribution_recur_id']) {
-      $recurringContribution = civicrm_api3('ContributionRecur', 'get', array(
-        'id' => $contribution['contribution_recur_id'],
-        'sequential' => TRUE,
-      ));
-
-      if (count($recurringContribution['values'])) {
-        $recurringContribution = $recurringContribution['values'][0];
-      }
-      else {
-        $recurringContribution = NULL;
-      }
-    }
-
-    foreach ($lineItems as $lineItem) {
-      $priceFieldId = $lineItem['price_field_id'];
-      $priceFieldValuId = $lineItem['price_field_value_id'];
-
-      try {
-        $invidiaulConfig = civicrm_api3('PricesetIndividualContribution', 'getsingle', array(
-          'price_field_id' => $priceFieldId,
-          'price_field_value_id' => $priceFieldValuId,
-        ));
-        if (isset($invidiaulConfig['recurring_contribution_unit']) && $invidiaulConfig['recurring_contribution_unit']) {
-          if (!isset($contribution['tax_amount']) || $contribution['tax_amount'] == '') {
-            $contribution['tax_amount'] = 0;
-          }
-
-          $newContribution = $contribution;
-
-          $lineItemTaxAmount = (isset($lineItem['tax_amount']) && $lineItem['tax_amount'] != '') ? $lineItem['tax_amount'] : 0;
-
-          $newContribution['total_amount'] = $lineItem['line_total'] + $lineItemTaxAmount;
-          $newContribution['net_amount'] = $newContribution['total_amount'];
-          $newContribution['tax_amount'] = $lineItemTaxAmount;
-          if (isset($invidiaulConfig['contribution_source'])) {
-            $newContribution['contribution_source'] = $invidiaulConfig['contribution_source'];
-          }
-
-          if (number_format(floatval($newContribution['total_amount']), 6) != number_format(floatval($contribution['total_amount']), 6)) {
-            unset($newContribution['id']);
-            unset($newContribution['contribution_id']);
-            unset($newContribution['contribution_recur_id']);
-            unset($newContribution['invoice_id']);
-            unset($newContribution['trxn_id']);
-
-            $contribution['total_amount'] -= $newContribution['total_amount'];
-            $contribution['net_amount'] -= $newContribution['net_amount'];
-            $contribution['tax_amount'] -= $newContribution['tax_amount'];
-          }
-          else {
-            $mainContributionUpdated = TRUE;
-          }
-
-          if ($recurringContribution) {
-            $newRecurringContribution = $recurringContribution;
-
-            if (!isset($newContribution['id'])) {
-              unset($newRecurringContribution['id']);
-              unset($newRecurringContribution['trxn_id']);
-              unset($newRecurringContribution['invoice_id']);
-            }
-
-            $newRecurringContribution['amount'] = $newContribution['total_amount'];
-            $newRecurringContribution['frequency_unit'] = $invidiaulConfig['recurring_contribution_unit'];
-            $newRecurringContribution['frequency_interval'] = $invidiaulConfig['recurring_contribution_interval'];
-
-            $nextDate = new DateTime(date('Y-m-d 00:00:00'));
-            $nextDate->modify("+{$invidiaulConfig['recurring_contribution_interval']} " .
-              "{$invidiaulConfig['recurring_contribution_unit']}s");
-
-            $newRecurringContribution['next_sched_contribution_date'] = $nextDate->format("Y-m-d H:i:s");
-            $newRecurringContribution['next_sched_contribution'] = $nextDate->format("Y-m-d H:i:s");
-
-            if (!isset($newContribution['id'])) {
-              $recurringContribution['amount'] -= $newRecurringContribution['amount'];
-            }
-            else {
-              $mainRecurringContributionUpdated = TRUE;
-            }
-
-            try {
-              $newRecurringContribution = civicrm_api3('ContributionRecur', 'create', $newRecurringContribution);
-              $newContribution['contribution_recur_id'] = $newRecurringContribution['id'];
-            }
-            catch (CiviCRM_API3_Exception $e) {
-
-            }
-
-          }
-
-          try {
-
-            $priceFieldObject = civicrm_api3('PriceField', 'getsingle', [
-              'return' => ["price_set_id"],
-              'id'     => $lineItem['price_field_id'],
-            ]);
-
-            if (!isset($newContribution['id'])) {
-              $newContribution['line_item'] = array(
-                $priceFieldObject['price_set_id'] => array(),
-              );
-            }
-
-            $newContribution = civicrm_api3('Contribution', 'create', $newContribution);
-            $processedContributions[] = $newContribution['id'];
-
-            CRM_Core_DAO::setFieldValue('CRM_Price_DAO_LineItem', $lineItem['id'], 'contribution_id', $newContribution['id']);
-            CRM_Core_DAO::setFieldValue('CRM_Price_DAO_LineItem', $lineItem['id'], 'entity_id', $newContribution['id']);
-
-            $updatedLineItems = TRUE;
-
-          }
-          catch (CiviCRM_API3_Exception $e) {
-
-          }
-
-        }
-      }
-      catch (CiviCRM_API3_Exception $e) {
-        // Line item configuration not found. Skip!
-      }
-    }
-
-    $recurringAttachedWithMembership = TRUE;
-    if ($recurringContribution && !$mainRecurringContributionUpdated) {
-
-      $memberships = civicrm_api3('Membership', 'get', array(
-        'contribution_recur_id' => $recurringContribution['id'],
-        'sequential'            => 1,
-      ));
-      $memberships = count($memberships['values']);
-
-      $recurringContributionParams = array(
-        'id'                     => $recurringContribution['id'],
-        'amount'                 => $recurringContribution['amount'],
-      );
-      if ($memberships == 0) {
-        $recurringAttachedWithMembership = FALSE;
-        $recurringContributionParams['contribution_status_id'] = 'Cancelled';
-      }
-
-      civicrm_api3('ContributionRecur', 'create', $recurringContributionParams);
-    }
-
-    if (!$mainContributionUpdated && $updatedLineItems) {
-
-      $contributionParams = array(
-        'total_amount'          => $contribution['total_amount'],
-        'tax_amount'            => $contribution['tax_amount'],
-        'net_amount'            => $contribution['net_amount'],
-        'id'                    => $contribution['id'],
-      );
-
-      if (!$recurringAttachedWithMembership) {
-        $contributionParams['contribution_recur_id'] = 'null';
-      }
-
-      civicrm_api3('Contribution', 'create', $contributionParams);
-    }
+  $processor = new CRM_Pricesetfrequency_Contribution($dao->id);
+  Civi::$statics[E::LONG_NAME]['contributionProcessor'] = $processor;
+  if (!$processor->isError
+  && !$processor->isFinished) {
+    $processor->process();
   }
+  unset(Civi::$statics[E::LONG_NAME]['contributionProcessor']);
 }
 
 /**
@@ -1037,5 +932,40 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
 function pricesetfrequency_civicrm_apiWrappers(&$wrappers, $apiRequest) {
   if ($apiRequest['entity'] == 'Contribution' && $apiRequest['action'] == 'completetransaction') {
     $wrappers[] = new CRM_Pricesetfrequency_APIWrappers_ContributionTransactionWrapper();
+  }
+}
+
+/**
+ * Implements hook_civicrm_alterMailParams().
+ */
+function pricesetfrequency_civicrm_alterMailParams(&$params, $context) {
+  if (!isset($params['valueName']))
+    return;
+
+  switch($params['valueName']) {
+    case 'contribution_recurring_notify':
+      if(!empty(Civi::$statics[E::LONG_NAME]['defer_recurringNotify']) && ($context == 'singleEmail')) {
+        $params['abortMailSend'] = TRUE;
+        Civi::log()->info('Found priceset frequencies, deferring recurring contribution notification email.');
+      }
+      break;
+    case 'contribution_online_receipt':
+    case 'membership_online_receipt':
+      $contribution_id = $params['tplParams']['contributionID'];
+      if(!empty(Civi::$statics[E::LONG_NAME]['receipt_sent'][$contribution_id]) && ($context == 'singleEmail')) {
+        $params['abortMailSend'] = TRUE;
+      }
+      break;
+  }
+}
+
+/**
+ * Implements hook_civicrm_pre().
+ */
+function pricesetfrequency_civicrm_pre($op, $objectName, $id, &$params) {
+  if(($objectName == 'Activity') &&
+     (($op == 'create') || ($op == 'edit')) &&
+     !empty(Civi::$statics[E::LONG_NAME]['activity_subject'][$id])) {
+    $params['subject'] = Civi::$statics[E::LONG_NAME]['activity_subject'][$id];
   }
 }
