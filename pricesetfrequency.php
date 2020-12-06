@@ -767,10 +767,6 @@ function savePriceFieldOptionExtras($fieldId, $optionId, &$form) {
     $recurringInterval = 1;
   }
 
-  if ($recurringUnit == '') {
-    $recurringInterval = '';
-  }
-
   $individualContribution = civicrm_api3('PricesetIndividualContribution', 'get', [
     'price_field_id'       => $fieldId,
     'price_field_value_id' => $optionId,
@@ -780,8 +776,15 @@ function savePriceFieldOptionExtras($fieldId, $optionId, &$form) {
 
   if (count($individualContribution) > 0) {
     $individualContribution = $individualContribution[0];
+    if ($recurringUnit == '') {
+      civicrm_api3('PricesetIndividualContribution', 'delete', [ 'id' => $individualContribution['id'] ] );
+      return;
+    }
   }
   else {
+    if ($recurringUnit == '') {
+      return;
+    }
     $individualContribution = array();
   }
 
