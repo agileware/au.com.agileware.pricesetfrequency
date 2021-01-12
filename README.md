@@ -2,7 +2,7 @@
 
 This is a [CiviCRM](https://civicrm.org) extension that enables a single Contribution page to have options for multiple recurring Contributions, each with different recurring payment schedules (frequency).
 Such that you can provide donation frequency options or membership renewal of daily, weekly, monthly or yearly with varying intervals.
-This is implemented by adding two new fields to each Priceset Option:
+This is implemented by adding two new fields to each **Priceset Option** within a **Priceset**:
 
 * **Recurring Contribution Unit**: Which determines if this option should generate a recurring Contribution. Options: no recurrence, day, week, month, year  
 * **Recurring Contribution Interval**: Which determines the interval of the recurrence. Integer field.
