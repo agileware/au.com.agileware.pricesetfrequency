@@ -9,7 +9,11 @@ This is implemented by adding two new fields to each Priceset Option:
 
 When the Contribution page is processed, each Priceset Option with a defined **Recurring Contribution Unit** will result in the creation of a recurring Contribution according to the options selected. 
 
-For example, when using this extension, it is now possible to implement a Donation page with the following options on a single Contribution page.
+![Australian Greens](images/screenshot.png)
+
+The screenshot above displays the **Recurring Contribution Unit** and **Recurring Contribution Interval** fields for a Membership Priceset.
+
+Using this extension you can now implement a single Donation page with multiple recurring payment options, such as:
 
 * Donate $1 per day
 * Donate $5 per week
@@ -20,7 +24,7 @@ For example, when using this extension, it is now possible to implement a Donati
 
 Development of this CiviCRM extension was kindly sponsored by [Australian Greens](https://greens.org.au).
 
-![Australian Greens](logo/AustralianGreensLogo_official.svg) 
+![Australian Greens](images/AustralianGreensLogo_official.svg) 
 
 ## About the Authors
 
@@ -38,4 +42,4 @@ CiviCRM Priceset Frequency was developed by the team at [Agileware](https://agil
 
 Support your Australian [CiviCRM](https://civicrm.org) developers, [contact Agileware](https://agileware.com.au/contact) today!
 
-![Agileware](logo/agileware-logo.png)
+![Agileware](images/agileware-logo.png)
