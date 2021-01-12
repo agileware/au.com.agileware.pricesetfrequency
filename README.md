@@ -1,40 +1,39 @@
-# au.com.agileware.pricesetfrequency
+# CiviCRM Priceset Frequency (au.com.agileware.pricesetfrequency)
 
-The extension is licensed under [AGPL-3.0](LICENSE.txt).
+This is a [CiviCRM](https://civicrm.org) extension that enables a single Contribution page to have options for multiple recurring Contributions, each with different recurring payment schedules (frequency).
+Such that you can provide donation frequency options or membership renewal of daily, weekly, monthly or yearly with varying intervals.
+This is implemented by adding two new fields to each Priceset Option:
+* **Recurring Contribution Unit**: Which determines if this option should generate a recurring Contribution. Options: no recurrence, day, week, month, year  
+* **Recurring Contribution Interval**: Which determines the interval of the recurrence. Integer field.
 
-## Requirements
+When the Contribution page is processed, each Priceset Option with a defined **Recurring Contribution Unit** will result in the creation of a recurring Contribution according to the options selected. 
 
-* PHP v5.4+
-* CiviCRM (*FIXME: Version number*)
+For example, when using this extension, it is now possible to implement a Donation page with the following options on a single Contribution page.
+* Donate $1 per day
+* Donate $5 per week
+* Donate $30 per month
+* Donate $300 per year
 
-## Installation (Web UI)
+## Sponsorship
 
-This extension has not yet been published for installation via the web UI.
+Development of this CiviCRM extension was kindly sponsored by [Australian Greens](https://greens.org.au).
 
-## Installation (CLI, Zip)
+![Australian Greens](logo/AustralianGreensLogo_official.svg) 
 
-Sysadmins and developers may download the `.zip` file for this extension and
-install it with the command-line tool [cv](https://github.com/civicrm/cv).
+## About the Authors
 
-```bash
-cd <extension-dir>
-cv dl au.com.agileware.pricesetfrequency@https://github.com/FIXME/au.com.agileware.pricesetfrequency/archive/master.zip
-```
+CiviCRM Priceset Frequency was developed by the team at [Agileware](https://agileware.com.au).
 
-## Installation (CLI, Git)
+[Agileware](https://agileware.com.au) provide a range of CiviCRM services including:
 
-Sysadmins and developers may clone the [Git](https://en.wikipedia.org/wiki/Git) repo for this extension and
-install it with the command-line tool [cv](https://github.com/civicrm/cv).
+  * CiviCRM migration
+  * CiviCRM integration
+  * CiviCRM extension development
+  * CiviCRM support
+  * CiviCRM hosting
+  * CiviCRM remote training services
+  * And of course, CiviContact development and support
 
-```bash
-git clone https://github.com/FIXME/au.com.agileware.pricesetfrequency.git
-cv en pricesetfrequency
-```
+Support your Australian [CiviCRM](https://civicrm.org) developers, [contact Agileware](https://agileware.com.au/contact) today!
 
-## Usage
-
-(* FIXME: Where would a new user navigate to get started? What changes would they see? *)
-
-## Known Issues
-
-(* FIXME *)
+![Agileware](logo/agileware-logo.png)
