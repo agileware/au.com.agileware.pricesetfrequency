@@ -31,9 +31,9 @@ class CRM_Pricesetfrequency_Contribution {
   private $lineItems;
 
   /**
-   * @var array processed contributions - no usage yet
+   * @var array processed contributions
    */
-  private $contributions = [];
+  static private $contributions = [];
 
   /**
    * @var int number of total line items
@@ -43,7 +43,6 @@ class CRM_Pricesetfrequency_Contribution {
   private $lineItemsGroupCount = 0;
 
   private $lineItemProcessed = 0;
-
 
   /**
    * CRM_Pricesetfrequency_Contribution constructor.
@@ -95,7 +94,7 @@ class CRM_Pricesetfrequency_Contribution {
       $this->logError('Failed to send receipt.', $e);
     }
 
-    foreach ($this->lineItems as $unit => $value) {
+    foreach ($this->lineItems as $unit => &$value) {
       if ($unit == 'one-off') {
         $contribution = $this->processContribution($value);
         if ($contribution) {
@@ -104,7 +103,7 @@ class CRM_Pricesetfrequency_Contribution {
         }
       }
       else {
-        foreach ($value as $interval => $lineItems) {
+        foreach ($value as $interval => &$lineItems) {
           $contribution = $this->processContribution($lineItems);
           if ($contribution) {
             $contribution = $this->processRecurringContribution($unit, $interval, $contribution);
@@ -118,6 +117,20 @@ class CRM_Pricesetfrequency_Contribution {
             }
           }
         }
+      }
+    }
+
+    if($this->lineItemProcessed) {
+      // Save the line items in the active transaction if present
+      if(CRM_Core_Transaction::isActive()) {
+        CRM_Core_Transaction::addCallback(CRM_Core_Transaction::PHASE_PRE_COMMIT, [
+          $this,
+          'saveLineItems'
+        ]);
+      }
+      // Otherwise, just do it now
+      else {
+        $this->saveLineItems();
       }
     }
 
@@ -267,7 +280,7 @@ class CRM_Pricesetfrequency_Contribution {
    *
    * @return array|null
    */
-  private function processContribution($lineItems) {
+  private function processContribution(&$lineItems) {
     $contribution = $this->sourceContribution;
     if (!$this->isLastContribution(count($lineItems))) {
       // udpate the source contribution for the last items
@@ -310,9 +323,9 @@ class CRM_Pricesetfrequency_Contribution {
     $this->storeContribution($contribution);
 
     // update line items to link to the new contribution
-    foreach ($lineItems as $lineItem) {
-      CRM_Core_DAO::setFieldValue('CRM_Price_DAO_LineItem', $lineItem['id'], 'contribution_id', $contribution['id']);
-      CRM_Core_DAO::setFieldValue('CRM_Price_DAO_LineItem', $lineItem['id'], 'entity_id', $contribution['id']);
+    foreach ($lineItems as &$lineItem) {
+      $lineItem['contribution_id'] = $contribution['id'];
+      $line_item['entity_id'] = $contribution['id'];
       $contribution['_is_membership'] |= ('civicrm_membership' == $lineItem['entity_table']);
       $this->lineItemProcessed++;
     }
@@ -479,8 +492,21 @@ class CRM_Pricesetfrequency_Contribution {
    */
   private function storeContribution($contribution) {
     if ($contribution['id']) {
-      $this->contributions[$contribution['id']] = $contribution;
+      static::$contributions[$contribution['id']] = $contribution;
     }
+  }
+
+  /**
+   * Check if the given contribution has already been processed.
+   * This is to guard against the possibility that a contributions might be
+   * saved twice with incorrect line items.
+   *
+   * @param $id int
+   *
+   * @return bool
+   */
+  public function hasProcessedContribution($id) {
+  	return array_key_exists($id, static::$contributions);
   }
 
   /**
@@ -513,6 +539,21 @@ class CRM_Pricesetfrequency_Contribution {
         Civi::log()->warning('Could not update activity subject',
                              [ 'message' => $e->getMessage(),
                                'trace'   => CRM_Core_Error::formatBacktrace($e->getTrace()) ]);
+      }
+    }
+  }
+
+  /**
+   * Save the updated line items into the database
+   */
+  public function saveLineItems() {
+    foreach ($this->lineItems as $unit => $lineItems) {
+      if($unit != 'one-off') {
+        $lineItems = call_user_func_array('array_merge', $lineItems);
+      }
+      foreach($lineItems as $lineItem) {
+        CRM_Core_DAO::setFieldValue('CRM_Price_DAO_LineItem', $lineItem['id'], 'contribution_id', $lineItem['contribution_id']);
+        CRM_Core_DAO::setFieldValue('CRM_Price_DAO_LineItem', $lineItem['id'], 'entity_id', $lineItem['entity_id']);
       }
     }
   }
