@@ -923,7 +923,8 @@ function pricesetfrequency_civicrm_postSave_civicrm_contribution($dao) {
   $processor = new CRM_Pricesetfrequency_Contribution($dao->id);
   Civi::$statics[E::LONG_NAME]['contributionProcessor'] = $processor;
   if (!$processor->isError
-  && !$processor->isFinished) {
+      && !$processor->isFinished
+      && !$processor->hasProcessedContribution($dao->id)) {
     $processor->process();
   }
   unset(Civi::$statics[E::LONG_NAME]['contributionProcessor']);
