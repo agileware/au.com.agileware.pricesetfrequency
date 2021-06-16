@@ -310,7 +310,7 @@ class CRM_Pricesetfrequency_Contribution {
     }
 
     $contribution['skipLineItem'] = 1;
-    $contribution['financial_type_id'] = $lineItems[0]['financial_type_id'];
+    unset($contribution['financial_type_id']);
 
     try {
       $contribution = civicrm_api3('Contribution', 'create', $contribution);
@@ -319,7 +319,10 @@ class CRM_Pricesetfrequency_Contribution {
       $this->logError('Failed to create contribution.', $e);
       return NULL;
     }
+
     $contribution['is_membership'] = FALSE;
+    $contribution['financial_type_id'] = $lineItems[0]['financial_type_id'];
+
     $this->storeContribution($contribution);
 
     // update line items to link to the new contribution
@@ -404,6 +407,8 @@ class CRM_Pricesetfrequency_Contribution {
       return NULL;
     }
     $contribution['contribution_recur_id'] = $contributionRecur['id'];
+    unset($contribution['financial_type_id']);
+
     try {
       $contribution = civicrm_api3('Contribution', 'create', $contribution);
       $contribution = reset($contribution['values']);
@@ -547,13 +552,22 @@ class CRM_Pricesetfrequency_Contribution {
    * Save the updated line items into the database
    */
   public function saveLineItems() {
+    $contributions = [];
     foreach ($this->lineItems as $unit => $lineItems) {
       if($unit != 'one-off') {
         $lineItems = call_user_func_array('array_merge', $lineItems);
       }
       foreach($lineItems as $lineItem) {
         CRM_Core_DAO::setFieldValue('CRM_Price_DAO_LineItem', $lineItem['id'], 'contribution_id', $lineItem['contribution_id']);
-        CRM_Core_DAO::setFieldValue('CRM_Price_DAO_LineItem', $lineItem['id'], 'entity_id', $lineItem['entity_id']);
+	CRM_Core_DAO::setFieldValue('CRM_Price_DAO_LineItem', $lineItem['id'], 'entity_id', $lineItem['entity_id']);
+	$contributions[$lineItem['contribution_id']] = TRUE;
+      }
+    }
+
+    foreach (array_keys($contributions) as $id) {
+      if ($this->hasProcessedContribution($id)) {
+        $contribution = &static::$contributions[$id];
+        CRM_Core_DAO::setFieldValue('CRM_Contribute_BAO_Contribution', $id, 'financial_type_id', $contribution['financial_type_id']);
       }
     }
   }
