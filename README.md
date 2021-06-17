@@ -20,6 +20,12 @@ Using this extension you can now implement a single Donation page with multiple 
 * Donate $30 per month
 * Donate $300 per year
 
+When using this with Membership payments it is important that the Membership Type has the same Recurring terms as you wish to have on the contribution page. So for example, if you wanted to make 12 monthly payments for a memberhsip you would:
+
+* Set the Membership Type Monthly Terms to 1 month
+* Set the corresponding Priceset Option for the matching Membership Type to 12 **Number of Terms** (since you want the payment to happen 12 times)
+* Set the corresponding Priceset Option for the matching Membershipt Type to 1 **Recurring Contribution Interval** (since you want the payment to happen each month)
+
 ## Sponsorship
 
 Development of this CiviCRM extension was kindly sponsored by [Australian Greens](https://greens.org.au).
