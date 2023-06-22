@@ -943,10 +943,10 @@ function pricesetfrequency_civicrm_apiWrappers(&$wrappers, $apiRequest) {
  * Implements hook_civicrm_alterMailParams().
  */
 function pricesetfrequency_civicrm_alterMailParams(&$params, $context) {
-  if (!isset($params['valueName']))
+  if (!isset($params['workflow']))
     return;
 
-  switch($params['valueName']) {
+  switch($params['workflow']) {
     case 'contribution_recurring_notify':
       if(!empty(Civi::$statics[E::LONG_NAME]['defer_recurringNotify']) && ($context == 'singleEmail')) {
         $params['abortMailSend'] = TRUE;
