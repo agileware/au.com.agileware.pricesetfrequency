@@ -36,8 +36,8 @@ class CRM_Pricesetfrequency_APIWrappers_ContributionTransactionWrapper implement
         'id' => $contributionRecurId,
       ));
     }
-    catch (CiviCRM_API3_Exception $e) {
-
+    catch (CRM_Core_Exception $e) {
+      \Civi::log()->error($e->getMessage());
     }
     return $result;
   }

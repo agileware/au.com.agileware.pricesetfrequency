@@ -90,7 +90,7 @@ class CRM_Pricesetfrequency_Contribution {
         'receipt_update' => 1,
       ]);
       Civi::$statics[E::LONG_NAME]['receipt_sent'][$this->sourceContribution['id']] = TRUE;
-    } catch (CiviCRM_API3_Exception $e) {
+    } catch (CRM_Core_Exception $e) {
       $this->logError('Failed to send receipt.', $e);
     }
 
@@ -144,11 +144,9 @@ class CRM_Pricesetfrequency_Contribution {
       $recurringContribution->find(true);
 
       CRM_Contribute_BAO_ContributionPage::recurringNotify(
+        $contribution['id'],
         CRM_Core_Payment::RECURRING_PAYMENT_START,
-        $contribution['contact_id'],
-        $contribution['contribution_page_id'] ?? NULL,
         $recurringContribution,
-        $autoRenewMembership
       );
     }
 
@@ -200,7 +198,7 @@ class CRM_Pricesetfrequency_Contribution {
         'id' => $contributionID,
         'return' => ['contribution_page_id', 'is_template'],
       ]);
-    } catch (CiviCRM_API3_Exception $e) {
+    } catch (CRM_Core_Exception $e) {
       $this->logError('Failed to get the contribution.', $e);
       return;
     }
@@ -225,7 +223,7 @@ class CRM_Pricesetfrequency_Contribution {
         ],
         'options' => ['limit' => 0],
       ]);
-    } catch (CiviCRM_API3_Exception $e) {
+    } catch (CRM_Core_Exception $e) {
       $this->logError('Failed to get the line items.', $e);
       return;
     }
@@ -265,7 +263,7 @@ class CRM_Pricesetfrequency_Contribution {
         $recurringContribution = civicrm_api3('ContributionRecur', 'getsingle', [
           'id' => $this->sourceContribution['contribution_recur_id'],
         ]);
-      } catch (CiviCRM_API3_Exception $e) {
+      } catch (CRM_Core_Exception $e) {
         $this->logError('Failed to get the recurring contribution.', $e);
         return;
       }
@@ -315,21 +313,20 @@ class CRM_Pricesetfrequency_Contribution {
     try {
       $contribution = civicrm_api3('Contribution', 'create', $contribution);
       $contribution = reset($contribution['values']);
-    } catch (CiviCRM_API3_Exception $e) {
+    } catch (CRM_Core_Exception $e) {
       $this->logError('Failed to create contribution.', $e);
       return NULL;
     }
-
+    $contribution['amount_level'] = is_array($contribution['amount_level']) ? implode(CRM_Core_DAO::VALUE_SEPARATOR, $contribution['amount_level']) : $contribution['amount_level'];
     $contribution['is_membership'] = FALSE;
     $contribution['financial_type_id'] = $lineItems[0]['financial_type_id'];
-
     $this->storeContribution($contribution);
 
     // update line items to link to the new contribution
     foreach ($lineItems as &$lineItem) {
       $lineItem['contribution_id'] = $contribution['id'];
       $line_item['entity_id'] = $contribution['id'];
-      $contribution['_is_membership'] |= ('civicrm_membership' == $lineItem['entity_table']);
+      $contribution['is_membership'] |= ('civicrm_membership' == $lineItem['entity_table']);
       $this->lineItemProcessed++;
     }
 
@@ -358,7 +355,7 @@ class CRM_Pricesetfrequency_Contribution {
           'contribution_status_id' => 'Cancelled',
         ]);
       }
-    } catch (CiviCRM_API3_Exception $e) {
+    } catch (CRM_Core_Exception $e) {
       $this->logError('Failed to unset the recurring for one-off contribution.', $e);
       return NULL;
     }
@@ -387,7 +384,7 @@ class CRM_Pricesetfrequency_Contribution {
     $contributionRecur['amount'] = $contribution['total_amount'];
     $contributionRecur['frequency_unit'] = $unit;
     $contributionRecur['frequency_interval'] = $interval;
-    $contributionRecur['auto_renew'] = $contribution['_is_membership'];
+    $contributionRecur['auto_renew'] = $contribution['is_membership'];
     // next billing date
     try {
       $nextDate = new DateTime(date('Y-m-d 00:00:00'));
@@ -398,11 +395,10 @@ class CRM_Pricesetfrequency_Contribution {
     $nextDate->modify("+{$interval} {$unit}s");
     $contributionRecur['next_sched_contribution_date'] = $nextDate->format("Y-m-d H:i:s");
     $contributionRecur['next_sched_contribution'] = $nextDate->format("Y-m-d H:i:s");
-
     try {
       $contributionRecur = civicrm_api3('ContributionRecur', 'create', $contributionRecur);
       $contributionRecur = array_shift($contributionRecur['values']);
-    } catch (CiviCRM_API3_Exception $e) {
+    } catch (CRM_Core_Exception $e) {
       $this->logError('Failed to create recurring contribution.', $e);
       return NULL;
     }
@@ -412,7 +408,7 @@ class CRM_Pricesetfrequency_Contribution {
     try {
       $contribution = civicrm_api3('Contribution', 'create', $contribution);
       $contribution = reset($contribution['values']);
-    } catch (CiviCRM_API3_Exception $e) {
+    } catch (CRM_Core_Exception $e) {
       $this->logError('Failed to create contribution.', $e);
       return NULL;
     }
@@ -444,7 +440,7 @@ class CRM_Pricesetfrequency_Contribution {
           'contribution_id' => $this->sourceContribution['id'],
           'options' => ['limit' => 0],
         ]);
-      } catch (CiviCRM_API3_Exception $e) {
+      } catch (CRM_Core_Exception $e) {
         $this->logError('Failed to get the membership.', $e);
         continue;
       }
@@ -454,7 +450,7 @@ class CRM_Pricesetfrequency_Contribution {
             $mp['contribution_id'] = $contribution['id'];
             try {
               civicrm_api3('MembershipPayment', 'create', $mp);
-            } catch (CiviCRM_API3_Exception $e) {
+            } catch (CRM_Core_Exception $e) {
               $this->logError('Failed to update membership payment.', $e);
               continue;
             }
@@ -469,7 +465,7 @@ class CRM_Pricesetfrequency_Contribution {
       try {
         $membership = civicrm_api3('Membership', 'create', $membership);
         $membership = reset($membership['values']);
-      } catch (CiviCRM_API3_Exception $e) {
+      } catch (CRM_Core_Exception $e) {
         $this->logError('Failed to update the membership.', $e);
         continue;
       }
@@ -540,7 +536,7 @@ class CRM_Pricesetfrequency_Contribution {
         $subject = CRM_Activity_BAO_Activity::getActivitySubject($contribution);
         Civi::$statics[E::LONG_NAME]['activity_subject'][$activity['id']] = $subject;
       }
-      catch(CiviCRM_API3_Exception $e) {
+      catch(CRM_Core_Exception $e) {
         Civi::log()->warning('Could not update activity subject',
                              [ 'message' => $e->getMessage(),
                                'trace'   => CRM_Core_Error::formatBacktrace($e->getTrace()) ]);

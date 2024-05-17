@@ -177,7 +177,7 @@ function addContributionFormFields(&$form) {
     ));
     setPriceSetContributionDefaultValues($priceFieldExtras, $form);
   }
-  catch (CiviCRM_API3_Exception $e) {
+  catch (CRM_Core_Exception $e) {
 
   }
 }
@@ -189,7 +189,7 @@ function addContributionFormFields(&$form) {
  * @param $totalPriceFields
  * @param $updatedPriceFields
  * @return string
- * @throws CiviCRM_API3_Exception
+ * @throws CRM_Core_Exception
  */
 function getPriceFieldRecurringLabel($priceFieldId, &$totalPriceFields, &$updatedPriceFields, $forValidation = FALSE) {
   $totalPriceFields++;
@@ -204,7 +204,6 @@ function getPriceFieldRecurringLabel($priceFieldId, &$totalPriceFields, &$update
   else {
     $priceFieldExtras = NULL;
   }
-
   if ($priceFieldExtras) {
     return getRecurringContributionLabel($priceFieldExtras, $updatedPriceFields, $forValidation);
   }
@@ -289,7 +288,7 @@ function updateIsRecurringText(&$elements, &$form, $totalPriceFields, $updatedPr
  * @param $lineItems
  * @param $totalPriceFields
  * @param $updatedPriceFields
- * @throws CiviCRM_API3_Exception
+ * @throws CRM_Core_Exception
  */
 function updatePricesetFieldLabels(&$lineItems, &$totalPriceFields, &$updatedPriceFields) {
   foreach ($lineItems as $lineItemId => $priceFields) {
@@ -307,7 +306,7 @@ function updatePricesetFieldLabels(&$lineItems, &$totalPriceFields, &$updatedPri
  * @param $lineItems
  * @param $totalPriceFields
  * @param $updatedPriceFields
- * @throws CiviCRM_API3_Exception
+ * @throws CRM_Core_Exception
  */
 function getLinesItemsCountOfIndividualRecurrence(&$priceSets, &$totalPriceFields, &$updatedPriceFields) {
   foreach ($priceSets as $priceSetId => $priceFields) {
@@ -358,7 +357,7 @@ function pricesetfrequency_civicrm_alterContent(&$content, $context, $tplName, &
  * Set price set configuration for Amounts form.
  *
  * @param $form
- * @throws CiviCRM_API3_Exception
+ * @throws CRM_Core_Exception
  */
 function setPricesetConfiguration(&$form) {
   if (isset($form->_elementIndex['price_set_id']) && $form->_elementIndex['price_set_id']) {
@@ -398,7 +397,7 @@ function setPricesetConfiguration(&$form) {
  *
  * @param $priceSets
  * @param $priceSetIndividualContributions
- * @throws CiviCRM_API3_Exception
+ * @throws CRM_Core_Exception
  */
 function checkPriceSetsRecurrence($priceSets, &$priceSetIndividualContributions) {
   foreach ($priceSets as $priceSetId) {
@@ -473,10 +472,10 @@ function pricesetfrequency_civicrm_preProcess($formName, &$form) {
  * Set membership interval and duration if auto renew membership type is selected.
  *
  * @param $form
- * @throws CiviCRM_API3_Exception
+ * @throws CRM_Core_Exception
  */
 function setMembershipIntervalAndDuration(&$form) {
-  $lineItems = $form->_lineItem;
+  $lineItems = [$form->getPriceSetID() => $form->getLineItems()];
   foreach ($lineItems as $lineItemId => $priceFields) {
     foreach ($priceFields as $priceFieldId => $priceField) {
       if (isset($priceField['membership_type_id']) && !empty($priceField['membership_type_id']) && ($priceField['auto_renew'] == 1 || $priceField['auto_renew'] == 2)) {
@@ -500,7 +499,7 @@ function setMembershipIntervalAndDuration(&$form) {
  * Add contribution related fields on Option value form and price field form.
  * @param $formName
  * @param $form
- * @throws CiviCRM_API3_Exception
+ * @throws CRM_Core_Exception
  */
 function pricesetfrequency_civicrm_buildForm($formName, &$form) {
   if ($form->_action != CRM_Core_Action::DELETE) {
@@ -520,7 +519,7 @@ function pricesetfrequency_civicrm_buildForm($formName, &$form) {
     if ($formName == "CRM_Contribute_Form_Contribution_Confirm" || $formName == "CRM_Contribute_Form_Contribution_ThankYou") {
       $updatedPriceFields = 0;
       $totalPriceFields = 0;
-      $lineItems = $form->_lineItem;
+      $lineItems = [$form->getPriceSetID() => $form->getLineItems()];
       updatePricesetFieldLabels($lineItems, $totalPriceFields, $updatedPriceFields);
       // Replace the section that displays the recurring schedule.
       // We have the schedule displayed on each line item
@@ -538,7 +537,7 @@ function pricesetfrequency_civicrm_buildForm($formName, &$form) {
           'template' => "{$templatePath}/contribution-confirm-recur-region.tpl"
         ]);
       }
-      $form->_lineItem = $lineItems;
+      $form->setLineItems($lineItems[$form->getPriceSetID()]);
       $form->assign('lineItem', $lineItems);
       if ($formName == "CRM_Contribute_Form_Contribution_Confirm") {
         if (isset($form->_params['auto_renew']) && $form->_params['auto_renew']) {
@@ -676,7 +675,7 @@ function pricesetfrequency_fields_has_frequency($fields) {
           'price_field_value_id' => $priceValueID,
           'sequential' => TRUE,
         ]);
-      } catch (CiviCRM_API3_Exception $e) {
+      } catch (CRM_Core_Exception $e) {
         continue;
       }
       if ($individualContribution['recurring_contribution_unit']
@@ -755,7 +754,7 @@ function pricesetfrequency_civicrm_validateForm($formName, &$fields, &$files, &$
  * @param $fieldId
  * @param $optionId
  * @param $form
- * @throws CiviCRM_API3_Exception
+ * @throws CRM_Core_Exception
  */
 function savePriceFieldOptionExtras($fieldId, $optionId, &$form) {
 
@@ -802,7 +801,7 @@ function savePriceFieldOptionExtras($fieldId, $optionId, &$form) {
  *
  * @param $formName
  * @param $form
- * @throws CiviCRM_API3_Exception
+ * @throws CRM_Core_Exception
  */
 function pricesetfrequency_civicrm_postProcess($formName, &$form) {
   if ($form->_action != CRM_Core_Action::DELETE) {

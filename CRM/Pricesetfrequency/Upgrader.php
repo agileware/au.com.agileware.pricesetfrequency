@@ -60,13 +60,17 @@ class CRM_Pricesetfrequency_Upgrader extends CRM_Pricesetfrequency_Upgrader_Base
    *
    * @return TRUE on success
    * @throws Exception
-   *
-  public function upgrade_4200() {
-    $this->ctx->log->info('Applying update 4200');
-    CRM_Core_DAO::executeQuery('UPDATE foo SET bar = "whiz"');
-    CRM_Core_DAO::executeQuery('DELETE FROM bang WHERE willy = wonka(2)');
+   */
+  public function upgrade_1600(): bool {
+    $this->ctx->log->info('Applying update 1600 Ensure that all Membership Blocks associated with this extension are set to not be separate payments');
+    CRM_Core_DAO::executeQuery('UPDATE civicrm_membership_block mb
+      INNER JOIN civicrm_price_set_entity cpse ON cpse.entity_id = mb.entity_id AND cpse.entity_table = mb.entity_table
+      INNER JOIN civicrm_price_field cpf ON cpf.price_set_id = cpse.price_set_id
+      INNER JOIN civicrm_priceset_individual_contribution cpic ON cpic.price_field_id = cpf.id
+      SET mb.is_separate_payment = 0 
+      WHERE mb.membership_types IS NOT NULL');
     return TRUE;
-  } // */
+  }
 
 
   /**
