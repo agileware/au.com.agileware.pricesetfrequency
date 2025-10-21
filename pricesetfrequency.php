@@ -628,7 +628,7 @@ function setPriceSetContributionDefaultValues($priceFieldExtras, &$form) {
  * @throws CRM_Core_Exception
  */
 function validateSingleContributionFormFields($fields, &$errors) {
-  $recurringInterval = CRM_Utils_Array::value('recurring_contribution_interval', $fields);
+  $recurringInterval = $fields['recurring_contribution_interval'] ?? NULL;
 
   if ($recurringInterval != '' && (!CRM_Utils_Type::validate($recurringInterval, 'Int', FALSE, E::ts('Recurring Contribution Interval')) || $recurringInterval < 1)) {
     $errors['recurring_contribution_interval'] = E::ts('Recurring Contribution Interval must be a number greater than 1.');
