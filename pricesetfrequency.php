@@ -536,7 +536,7 @@ function setPriceSetContributionDefaultValues($priceFieldExtras, &$form) {
  * @throws CRM_Core_Exception
  */
 function validateSingleContributionFormFields($fields, &$errors) {
-  $recurringInterval = CRM_Utils_Array::value('recurring_contribution_interval', $fields);
+  $recurringInterval = $fields['recurring_contribution_interval'] ?? NULL;
 
   if ($recurringInterval != '' && (!CRM_Utils_Type::validate($recurringInterval, 'Int', FALSE, E::ts('Recurring Contribution Interval')) || $recurringInterval < 1)) {
     $errors['recurring_contribution_interval'] = E::ts('Recurring Contribution Interval must be a number greater than 1.');
@@ -883,10 +883,10 @@ function pricesetfrequency_civicrm_apiWrappers(&$wrappers, $apiRequest) {
  * Implements hook_civicrm_alterMailParams().
  */
 function pricesetfrequency_civicrm_alterMailParams(&$params, $context) {
-  if (!isset($params['valueName']))
+  if (!isset($params['workflow']))
     return;
 
-  switch($params['valueName']) {
+  switch($params['workflow']) {
     case 'contribution_recurring_notify':
       if(!empty(Civi::$statics[E::LONG_NAME]['defer_recurringNotify']) && ($context == 'singleEmail')) {
         $params['abortMailSend'] = TRUE;
