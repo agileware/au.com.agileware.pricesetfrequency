@@ -238,15 +238,28 @@ function getRecurringContributionLabel($priceFieldExtras, &$updatedPriceFields, 
 }
 
 /**
- * Alter fields for an event registration to make them into a demo form.
+ * Strip the dangling "every" wording that core leaves straight after the
+ * is_recur checkbox's label once this extension has taken over the
+ * recurring-schedule wording (see updateIsRecurringText()).
+ *
+ * Anchored on the stable `for="is_recur"` attribute rather than an exact,
+ * whitespace-sensitive literal HTML string, so it isn't tied to the precise
+ * markup/whitespace core happens to emit for a given contribution page
+ * configuration or core version.
  */
 function pricesetfrequency_civicrm_alterContent(&$content, $context, $tplName, &$object) {
-  if ($context == "form") {
-    if ($tplName == "CRM/Contribute/Form/Contribution/Main.tpl") {
-      $content = str_replace(".</label> every", ".</label>", $content);
-      $content = str_replace("</span>\n\n</label> every", "</span></label>", $content);
-    }
+  if ($context !== 'form' || $tplName !== 'CRM/Contribute/Form/Contribution/Main.tpl') {
+    return;
   }
+  if (strpos($content, 'for="is_recur"') === FALSE) {
+    return;
+  }
+
+  $content = preg_replace(
+    '/(<label\b[^>]*\bfor="is_recur"[^>]*>.*?<\/label>)\s*every\b/is',
+    '$1',
+    $content
+  );
 }
 
 /**
