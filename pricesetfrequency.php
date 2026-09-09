@@ -531,16 +531,48 @@ function validateSingleContributionFormFields($fields, &$errors) {
 }
 
 /**
- * Check if membership with auto renew available on the page.
+ * Check if any of the price field values selected in the submitted fields
+ * belong to a membership type with auto-renew enabled.
  *
- * @param $form
+ * Note: CRM_Contribute_Form_Contribution_Main does not expose
+ * $form->_membershipTypeValues (that property only exists on
+ * CRM_Member_Form_Membership), so this must be derived from the submitted
+ * price field selections instead.
+ *
+ * @param $fields array submitted form values
  * @return bool
  */
-function hasAutoRenewMembershipsOnForm($form) {
-  $membershipTypes = $form->_membershipTypeValues;
-  if (is_array($membershipTypes)) {
-    foreach ($membershipTypes as $membershipType) {
-      if (isset($membershipType['auto_renew']) && $membershipType['auto_renew']) {
+function hasAutoRenewMembershipsOnForm($fields) {
+  foreach ($fields as $key => $value) {
+    if (strpos($key, 'price_') === FALSE) {
+      continue;
+    }
+    $priceField = explode('_', $key)[1];
+    // unify the format
+    if (!is_array($value)) {
+      $value = [$value => 1];
+    }
+    foreach ($value as $priceValueID => $amount) {
+      try {
+        $priceFieldValue = civicrm_api3('PriceFieldValue', 'getsingle', [
+          'id' => $priceValueID,
+          'return' => ['membership_type_id'],
+        ]);
+      } catch (CRM_Core_Exception $e) {
+        continue;
+      }
+      if (empty($priceFieldValue['membership_type_id'])) {
+        continue;
+      }
+      try {
+        $membershipType = civicrm_api3('MembershipType', 'getsingle', [
+          'id' => $priceFieldValue['membership_type_id'],
+          'return' => ['auto_renew'],
+        ]);
+      } catch (CRM_Core_Exception $e) {
+        continue;
+      }
+      if (!empty($membershipType['auto_renew'])) {
         return TRUE;
       }
     }
@@ -613,7 +645,7 @@ function pricesetfrequency_civicrm_validateForm($formName, &$fields, &$files, &$
         }
 
 
-        if (hasAutoRenewMembershipsOnForm($form) && (!isset($fields['auto_renew']) || !$fields['auto_renew'])) {
+        if (hasAutoRenewMembershipsOnForm($fields) && (!isset($fields['auto_renew']) || !$fields['auto_renew'])) {
           $errors['auto_renew'] = E::ts('To proceed, you need to confirm the membership renewal.');
         }
 
