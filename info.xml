@@ -22,7 +22,7 @@
   </compatibility>
   <civix>
     <namespace>CRM/Pricesetfrequency</namespace>
-    <format>25.01.1</format>
+    <format>25.10.2</format>
   </civix>
   <classloader>
     <psr0 prefix="CRM_" path="."/>
@@ -32,5 +32,6 @@
   <mixins>
     <mixin>smarty-v2@1.0.3</mixin>
     <mixin>entity-types-php@2.0.0</mixin>
+    <mixin>scan-classes@1.0.0</mixin>
   </mixins>
 </extension>
